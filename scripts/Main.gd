@@ -272,12 +272,12 @@ func _draw_timer_text() -> void:
 		display_text = "3.00s"
 		display_color = TIMER_EXECUTING_COLOR
 	else:
-		var now_time := Time.get_ticks_msec() / 1000.0
-		var elapsed := clamp(now_time - turn_start_time, 0.0, TURN_INTERVAL)
+		var now_time: float = Time.get_ticks_msec() / 1000.0
+		var elapsed: float = clampf(now_time - turn_start_time, 0.0, TURN_INTERVAL)
 
 		# `snapped(elapsed, 0.01)` 的作用是把数字处理到 0.01 的精度。
 		# `"%0.2f"` 的作用是格式化成保留两位小数。
-		display_text = "%.2fs" % snapped(elapsed, 0.01)
+		display_text = "%.2fs" % snappedf(elapsed, 0.01)
 		display_color = TIMER_IDLE_COLOR
 
 	# 在屏幕左上角绘制文字。
