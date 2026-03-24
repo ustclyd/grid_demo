@@ -41,8 +41,8 @@ const CENTER_INDEX := int(GRID_COUNT / 2)
 # 每 5 秒结算一次动作。
 const TURN_INTERVAL := 5.0
 
-# 真正执行动作的阶段持续 0.5 秒。
-const EXECUTE_DURATION := 0.5
+# 真正执行动作的阶段持续 1.0 秒。
+const EXECUTE_DURATION := 1.0
 
 
 # ================================
@@ -194,7 +194,7 @@ func _on_timer_timeout() -> void:
 	is_executing = true
 	queue_redraw()
 
-	# 等待 0.5 秒。
+	# 等待 1.0 秒。
 	# 这段时间左上角固定显示 5.00s，颜色改成红色。
 	await get_tree().create_timer(EXECUTE_DURATION).timeout
 
