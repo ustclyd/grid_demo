@@ -96,6 +96,11 @@ func _ready() -> void:
 	# 把计时器间隔明确设置为 5 秒。
 	timer.wait_time = TURN_INTERVAL
 
+	# 先停掉场景里可能已经自动启动的旧计时，再按新的 5 秒重新开始。
+	# 这样可以保证“真实结算时间”和“左上角显示时间”从第一轮开始就完全同步。
+	timer.stop()
+	timer.start()
+
 	# 记录这一轮开始的时间。
 	# `Time.get_ticks_msec()` 会返回程序运行到现在经过了多少毫秒。
 	# 我们除以 1000.0，把它换算成秒。
@@ -272,8 +277,10 @@ func _draw_timer_text() -> void:
 		display_text = "%.2fs" % TURN_INTERVAL
 		display_color = TIMER_EXECUTING_COLOR
 	else:
-		var now_time: float = Time.get_ticks_msec() / 1000.0
-		var elapsed: float = clampf(now_time - turn_start_time, 0.0, TURN_INTERVAL)
+		# `timer.time_left` 表示“这一轮还剩多少秒”。
+		# 我们用“总时长 - 剩余时长”，得到已经过去了多久。
+		# 这样显示会和 Timer 的真实时间完全同步，不会自己漂移。
+		var elapsed: float = clampf(TURN_INTERVAL - timer.time_left, 0.0, TURN_INTERVAL)
 
 		# `snapped(elapsed, 0.01)` 的作用是把数字处理到 0.01 的精度。
 		# `"%0.2f"` 的作用是格式化成保留两位小数。
