@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://t4eubhslouv4"]
+
+[ext_resource type="Script" uid="uid://dctshdvvh8flf" path="res://scripts/Main.gd" id="1_elqb8"]
+
+[node name="Main" type="Node2D" unique_id=984216810]
+script = ExtResource("1_elqb8")
+
+[node name="Timer" type="Timer" parent="." unique_id=193919369]
+wait_time = 3.0
+autostart = true
