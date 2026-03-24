@@ -53,7 +53,10 @@ const EXECUTE_DURATION := 1.0
 # 变量在运行过程中是可以改变的。
 
 # 玩家当前所在的格子坐标。
-var player_grid := Vector2i(CENTER_INDEX, CENTER_INDEX)
+# 左下角对应：
+# - x = 0（最左边）
+# - y = GRID_COUNT - 1（最下边）
+var player_grid := Vector2i(0, GRID_COUNT - 1)
 
 # 玩家点击后，等待下一次结算时要移动到的目标格子。
 var pending_target := Vector2i.ZERO
@@ -142,11 +145,20 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			var clicked_grid := _screen_to_grid(event.position)
 
-			# 只有点在网格内部，才记录目标格子。
-			if _is_inside_grid(clicked_grid):
+			# 只有“点在网格内部”并且“目标格子与玩家当前位置相邻”时，
+			# 才会把这个点击记录成下一轮要执行的移动。
+			if _is_inside_grid(clicked_grid) and _is_adjacent_grid(player_grid, clicked_grid):
 				pending_target = clicked_grid
 				has_pending_target = true
-				queue_redraw()
+			else:
+				# 以下几种情况都视为“待机”：
+				# 1. 点到了自己所在的格子
+				# 2. 点到了不相邻的格子
+				# 3. 点到了网格外面
+				has_pending_target = false
+				pending_target = player_grid
+
+			queue_redraw()
 
 
 # ================================
@@ -244,6 +256,23 @@ func _is_inside_grid(grid: Vector2i) -> bool:
 		and grid.x < GRID_COUNT
 		and grid.y < GRID_COUNT
 	)
+
+
+# ================================
+# 工具函数：判断两个格子是否相邻
+# ================================
+#
+# 相邻的意思是：
+# 目标格子必须在玩家周围 8 个方向中的一个。
+# 如果点到自己所在格子，就不算移动。
+func _is_adjacent_grid(from_grid: Vector2i, to_grid: Vector2i) -> bool:
+	var delta_x: int = absi(to_grid.x - from_grid.x)
+	var delta_y: int = absi(to_grid.y - from_grid.y)
+
+	if delta_x == 0 and delta_y == 0:
+		return false
+
+	return delta_x <= 1 and delta_y <= 1
 
 
 # ================================
