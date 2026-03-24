@@ -38,8 +38,8 @@ const PLAYER_RING_WIDTH := 3.0
 # 中心格子的索引。
 const CENTER_INDEX := int(GRID_COUNT / 2)
 
-# 每 3 秒结算一次动作。
-const TURN_INTERVAL := 3.0
+# 每 5 秒结算一次动作。
+const TURN_INTERVAL := 5.0
 
 # 真正执行动作的阶段持续 0.5 秒。
 const EXECUTE_DURATION := 0.5
@@ -93,7 +93,7 @@ func _ready() -> void:
 	# 每次 Timer 超时，就自动调用我们的回调函数。
 	timer.timeout.connect(_on_timer_timeout)
 
-	# 把计时器间隔明确设置为 3 秒。
+	# 把计时器间隔明确设置为 5 秒。
 	timer.wait_time = TURN_INTERVAL
 
 	# 记录这一轮开始的时间。
@@ -180,17 +180,17 @@ func _draw() -> void:
 
 
 # ================================
-# 计时器回调：每 3 秒执行一次
+# 计时器回调：每 5 秒执行一次
 # ================================
 #
-# 每当 Timer 走完 3 秒，就会自动调用这个函数。
+# 每当 Timer 走完 5 秒，就会自动调用这个函数。
 func _on_timer_timeout() -> void:
 	# 进入执行阶段。
 	is_executing = true
 	queue_redraw()
 
 	# 等待 0.5 秒。
-	# 这段时间左上角固定显示 3.00s，颜色改成红色。
+	# 这段时间左上角固定显示 5.00s，颜色改成红色。
 	await get_tree().create_timer(EXECUTE_DURATION).timeout
 
 	# 如果之前有记录目标格子，就真正移动玩家。
@@ -258,18 +258,18 @@ func _draw_alert_mark(player_center: Vector2) -> void:
 # ================================
 #
 # 操作阶段：
-# - 显示 0.00s 到 3.00s
+# - 显示 0.00s 到 5.00s
 # - 蓝色
 #
 # 执行阶段：
-# - 固定显示 3.00s
+# - 固定显示 5.00s
 # - 红色
 func _draw_timer_text() -> void:
 	var display_text := ""
 	var display_color := TIMER_IDLE_COLOR
 
 	if is_executing:
-		display_text = "3.00s"
+		display_text = "%.2fs" % TURN_INTERVAL
 		display_color = TIMER_EXECUTING_COLOR
 	else:
 		var now_time: float = Time.get_ticks_msec() / 1000.0
