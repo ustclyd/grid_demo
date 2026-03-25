@@ -152,6 +152,27 @@ function Get-CommandPath {
     }
 }
 
+function Test-IsCommitEntryLine {
+    param(
+        [string]$Line
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Line)) {
+        return $false
+    }
+
+    $trimmedLine = $Line.Trim()
+
+    if (-not $trimmedLine.StartsWith("- ")) {
+        return $false
+    }
+
+    $hashPattern = [regex]::Escape($backtickChar) + "[0-9a-fA-F]{7,40}" + [regex]::Escape($backtickChar)
+    $timePattern = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
+
+    return [regex]::IsMatch($trimmedLine, $hashPattern) -and [regex]::IsMatch($trimmedLine, $timePattern)
+}
+
 function Initialize-DailyLogEnvironmentSection {
     param(
         [string]$LogFile
@@ -270,7 +291,7 @@ function Write-CommitEntryToDailyLog {
         $changedFilesText = (" | files: {0}" -f (($CommitInfo.ChangedFiles | ForEach-Object { $_.Trim() }) -join ", "))
     }
 
-    $entry = ("- [x] {0}{1}{0} {2} [{3}] {4}{5}" -f $backtickChar, $CommitInfo.Hash, $timestamp, $CommitInfo.Branch, $message, $changedFilesText)
+    $entry = ("- {0}{1}{0} {2} [{3}] {4}{5}" -f $backtickChar, $CommitInfo.Hash, $timestamp, $CommitInfo.Branch, $message, $changedFilesText)
 
     $todaySubmitIndex = -1
     $gitSectionIndex = -1
@@ -293,7 +314,7 @@ function Write-CommitEntryToDailyLog {
 
         while ($insertIndex -lt $lines.Count) {
             $currentLine = $lines[$insertIndex].Trim()
-            if ($currentLine.StartsWith("- [x]")) {
+            if (Test-IsCommitEntryLine -Line $currentLine) {
                 $insertIndex++
                 continue
             }
