@@ -1,28 +1,65 @@
 # 提交流程
 
-这份说明是给完全没用过命令行的新手准备的。你以后每次改完代码，基本照着这份文档做就可以。
+这份文档是给完全新手准备的。
+你以后每次改完代码，只要照着这里的步骤做，就能：
 
-## 1. 用什么工具
+1. 提交本地代码
+2. 自动写入 Obsidian 开发日志
+3. 在需要的时候把代码上传到 GitHub
 
-以后你可以直接用 `PowerShell`，不必专门开 `Git Bash`。
+## 0. 你要先知道的事
 
-最推荐的方式是：
+你现在已经有两份可用脚本：
+
+- [dev_commit.ps1](d:\GameDev\grid_demo\scripts\dev_commit.ps1)
+- [update_obsidian_log.ps1](d:\GameDev\grid_demo\scripts\update_obsidian_log.ps1)
+
+它们的关系是：
+
+- 你平时手动运行的是 `dev_commit.ps1`
+- `dev_commit.ps1` 负责执行 Git 提交
+- Git 提交成功后，会自动触发 `update_obsidian_log.ps1`
+- `update_obsidian_log.ps1` 负责写 Obsidian 开发日志
+
+所以你平时不需要手动运行日志脚本。
+
+## 1. 以后用什么终端
+
+以后你可以直接用：
+
+- `VS Code`
+- 底部终端
+- `PowerShell`
+
+一般来说，不需要专门再开 `Git Bash`。
+
+## 2. 每次提交之前，先怎么打开终端
+
+按下面顺序做：
 
 1. 打开 `VS Code`
 2. 打开你的项目文件夹 `D:\GameDev\grid_demo`
-3. 点击顶部菜单 `终端`
-4. 点击 `新建终端`
-5. 底部出现一个终端窗口
+3. 看顶部菜单栏
+4. 点击 `终端`
+5. 点击 `新建终端`
 
-如果终端前面显示的是：
+这时 VS Code 底部会弹出一个终端窗口。
+
+如果你看到类似：
 
 ```powershell
 PS D:\GameDev\grid_demo>
 ```
 
-说明你已经在正确的地方了。
+说明你已经在正确目录里了。
 
-如果不是这个路径，就输入：
+如果你看到的不是这个路径，比如：
+
+```powershell
+PS C:\Users\你的名字>
+```
+
+那就输入：
 
 ```powershell
 cd D:\GameDev\grid_demo
@@ -30,48 +67,60 @@ cd D:\GameDev\grid_demo
 
 然后按回车。
 
-## 2. 每次改完代码后先做什么
+## 3. 每次改完代码后，第一步做什么
 
-先看一眼 Git 状态，输入：
+先输入：
 
 ```powershell
 git status
 ```
 
+然后按回车。
+
 这句的作用是：
 
-- 看哪些文件被改了
-- 看哪些文件还没提交
-- 确认当前 Git 仓库状态正常
+- 看哪些文件改了
+- 看当前 Git 状态正不正常
+- 确认你是在正确的仓库里
 
-这是你以后最常用的第一句。
+这是你以后最常用的检查命令。
 
-## 3. 最推荐的提交方式
+## 4. 最推荐的提交方法
 
-你现在已经有一个提交脚本：
+### 4.1 只提交，不上传 GitHub
 
-```powershell
-.\scripts\dev_commit.ps1 -Message "这里写本次改动说明"
-```
-
-比如：
+在终端里输入：
 
 ```powershell
-.\scripts\dev_commit.ps1 -Message "feat: 完成相邻格移动逻辑"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "这里写本次修改说明"
 ```
+
+例如：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "feat: 完成玩家相邻格移动"
+```
+
+输入后按回车。
 
 这句会自动做这些事：
 
 1. `git add .`
-2. `git commit -m "你的说明"`
-3. commit 成功后自动写入 Obsidian 当日日志
+2. `git commit -m "..."`
+3. commit 成功后自动写入 Obsidian 日志
 
-## 4. 如果这次还想顺手上传 GitHub
+### 4.2 提交并上传 GitHub
 
-就在命令后面加 `-Push`：
+如果你这次还想顺手上传到 GitHub，就输入：
 
 ```powershell
-.\scripts\dev_commit.ps1 -Message "fix: 修复计时器和日志脚本" -Push
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "这里写本次修改说明" -Push
+```
+
+例如：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "fix: 修复日志脚本" -Push
 ```
 
 这句会自动做：
@@ -81,107 +130,194 @@ git status
 3. 自动写入 Obsidian 日志
 4. `git push`
 
-## 5. 如果你想手动一步一步做
+## 5. 为什么命令前面要写这么长一串 PowerShell
 
-也可以，不用脚本，直接输入：
-
-```powershell
-git status
-git add .
-git commit -m "这里写本次改动说明"
-```
-
-如果还要上传 GitHub，再输入：
+你现在不能直接运行：
 
 ```powershell
-git push
+.\scripts\dev_commit.ps1 -Message "..."
 ```
 
-注意：
+因为你的系统默认禁止直接运行 `.ps1` 脚本。
 
-- 你就算手动用 `git commit -m "..."`，Obsidian 日志也还是会自动写
-- 因为仓库里已经装了 `post-commit` hook
+所以我们现在固定用这种方式：
 
-## 6. 提交说明怎么写
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "..."
+```
 
-建议你每次 commit 都写清楚“这次到底改了什么”。
+它的意思是：
 
-常见写法：
+- 启动一个新的 PowerShell 进程
+- 临时绕过脚本执行限制
+- 然后运行你指定的脚本文件
+
+你现在不用去改系统设置，直接记住这条命令就够了。
+
+## 6. 每次提交后的检查方法
+
+### 6.1 检查 Git 提交是否成功
+
+如果提交成功，终端通常会看到类似：
 
 ```text
-feat: 新增一个功能
-fix: 修复一个问题
-refactor: 重构代码但不改功能
-docs: 修改文档
-setup: 配置环境
+[master abc1234] feat: 某个功能
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 ```
 
-例子：
+重点看这一行：
+
+```text
+[master abc1234] ...
+```
+
+只要看到这一行，通常就说明 commit 已经成功了。
+
+### 6.2 检查 Obsidian 日志是否成功写入
+
+去打开今天的开发日志文件。
+
+路径规则是：
+
+```text
+D:\obsidian\仓库\游戏开发\10-开发日志\YYYY\YYYY-MM\YYYY-MM-DD.md
+```
+
+比如今天是 `2026-03-25`，那就是：
+
+```text
+D:\obsidian\仓库\游戏开发\10-开发日志\2026\2026-03\2026-03-25.md
+```
+
+打开之后，找到：
+
+```md
+#### 六、Git 记录
+##### 今日提交
+```
+
+下面应该会多出一条类似：
+
+```md
+- [x] `abc1234` 2026-03-25 15:30:00 [master] feat: 某个功能 | files: scripts/Main.gd
+```
+
+如果有，说明日志写入成功。
+
+## 7. 如果命令报错了，先怎么判断是哪一步错了
+
+### 情况 A：看到了 `[master xxxx] ...`
+
+这表示：
+
+- Git commit 成功了
+
+如果后面又出现红字报错，那通常是：
+
+- commit 后自动执行的日志脚本出了问题
+
+也就是：
+
+- 提交成功
+- 写日志失败
+
+### 情况 B：根本没有看到 `[master xxxx] ...`
+
+这表示 commit 本身就失败了。
+
+这时应该优先检查：
+
+- `git status`
+- 提交说明有没有写好
+- 是否有冲突或其他 Git 错误
+
+### 情况 C：提交成功了，但 `-Push` 时报错
+
+这表示：
+
+- 本地提交成功
+- 上传 GitHub 失败
+
+常见原因是：
+
+- 没配置远程仓库
+- 没登录 GitHub
+- 网络问题
+
+## 8. 你以后最短记忆版
+
+### 普通提交
 
 ```powershell
-.\scripts\dev_commit.ps1 -Message "feat: 实现玩家每 5 秒结算一次移动"
-.\scripts\dev_commit.ps1 -Message "fix: 修复 Obsidian 日志脚本编码问题"
-.\scripts\dev_commit.ps1 -Message "docs: 新增提交流程说明"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "本次修改说明"
 ```
 
-## 7. 一次完整示例
+### 提交并上传 GitHub
 
-假设你刚改完 `Main.gd`，准备提交。
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "本次修改说明" -Push
+```
 
-在 VS Code 底部 PowerShell 终端输入：
+## 9. 一次完整示例
+
+假设你刚改完 `scripts/Main.gd`，准备提交。
+
+你应该这样做：
+
+1. 打开 VS Code
+2. 顶部点击 `终端`
+3. 点击 `新建终端`
+4. 在底部终端输入：
+
+```powershell
+cd D:\GameDev\grid_demo
+```
+
+5. 回车
+6. 输入：
 
 ```powershell
 git status
-.\scripts\dev_commit.ps1 -Message "feat: 调整玩家移动规则"
 ```
 
-如果你这次还想同步 GitHub：
+7. 回车
+8. 输入：
 
 ```powershell
-git status
-.\scripts\dev_commit.ps1 -Message "feat: 调整玩家移动规则" -Push
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "feat: 调整玩家移动逻辑"
 ```
 
-## 8. 如果提交后想确认有没有成功
+9. 回车
+10. 看终端是否出现 `[master xxxx] ...`
+11. 去 Obsidian 打开今天日志，检查是否写入成功
 
-输入：
+## 10. 如果你只想先测试脚本是否正常
+
+可以做一个空提交测试：
 
 ```powershell
-git log --oneline -5
+git commit --allow-empty -m "test hook"
 ```
 
-这句会显示最近 5 次提交。
-
-如果你看到刚才写的提交说明，说明提交成功了。
-
-然后再去 Obsidian 打开今天的日志文件，检查：
-
-- 是否写到了 `六、Git 记录`
-- 是否新增了一条提交记录
-
-## 9. 如果报错了先看哪
-
-如果命令执行后报错，先看错误属于哪一类：
-
-- `git` 报错：通常是 Git 命令本身问题
-- `powershell` 报错：通常是脚本问题
-- `push` 报错：通常是 GitHub 远程仓库或登录问题
-- Obsidian 日志没写进去：通常是 hook 或路径权限问题
-
-如果你看不懂报错，不要自己乱改。把终端完整报错复制出来，再处理。
-
-## 10. 以后最短操作版本
-
-以后你只要记住下面两句就够了。
-
-普通提交：
+或者直接用你的提交流程脚本：
 
 ```powershell
-.\scripts\dev_commit.ps1 -Message "本次修改说明"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "test hook"
 ```
 
-提交并上传 GitHub：
+## 11. 你以后最推荐的固定流程
 
-```powershell
-.\scripts\dev_commit.ps1 -Message "本次修改说明" -Push
-```
+每次改完代码以后：
+
+1. 打开 VS Code 底部终端
+2. 输入：
+   ```powershell
+   git status
+   ```
+3. 然后输入：
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Message "本次修改说明"
+   ```
+4. 如果这次要上传 GitHub，就加 `-Push`
+
+就这么简单。
