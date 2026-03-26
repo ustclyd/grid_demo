@@ -1,0 +1,18 @@
+class_name PlaybackEventType
+
+const SHOW_INTENT := "show_intent"
+const MOVE_UNIT := "move_unit"
+const TELEPORT_UNIT := "teleport_unit"
+const PICK_BAG := "pick_bag"
+const THROW_BAG := "throw_bag"
+const CONFLICT1_WIN := "conflict1_win"
+const CONFLICT1_LOSE := "conflict1_lose"
+const KNOCKBACK_UNIT := "knockback_unit"
+const CONFLICT2_WIN := "conflict2_win"
+const CONFLICT2_LOSE := "conflict2_lose"
+const DROP_BAG := "drop_bag"
+const REMOVE_UNIT := "remove_unit"
+const MARK_FORCED_STAY := "mark_forced_stay"
+const MARK_PORTAL_READY := "mark_portal_ready"
+const MARK_EXIT_READY := "mark_exit_ready"
+const MARK_PORTAL_OVERHEAT := "mark_portal_overheat"
