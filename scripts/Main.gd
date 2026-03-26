@@ -144,6 +144,15 @@ var turn_start_time := 0.0
 # 我们后面会拿“当前时间 - 这一轮开始时间”，算出已经过去了多少秒。
 
 var timer_font: Font
+
+# New architecture entry points.
+# They are wired in while the legacy prototype logic remains the source of truth.
+var game_state: GameState
+var turn_resolver := TurnResolver.new()
+var turn_presentation := TurnPresentation.new()
+var current_player_intent: ActionIntent
+var last_turn_result: TurnResult
+var last_playback_events: Array[PlaybackEvent] = []
 # 第 119 行：
 # 这一行定义了一个变量 `timer_font`。
 # 冒号 `:` 后面的 `Font` 是“类型标注”，表示：
@@ -223,6 +232,7 @@ func _ready() -> void:
 	# 所以这里启动后，它会按 5 秒一轮计时。
 
 	turn_start_time = Time.get_ticks_msec() / 1000.0
+	_sync_game_state_from_legacy()
 	# 第 183 行：
 	# `Time.get_ticks_msec()` 会返回：
 	# “程序从启动到现在，一共过了多少毫秒”
@@ -247,6 +257,7 @@ func _ready() -> void:
 	# 所以需要每一帧都刷新。
 
 	queue_redraw()
+	_initialize_runtime_state()
 	# 第 205 行：
 	# `queue_redraw()` 不是“立刻马上画”，
 	# 而是“告诉 Godot：这个节点需要重新绘制，请在接下来的绘制阶段调用 `_draw()`。”
@@ -330,6 +341,7 @@ func _input(event: InputEvent) -> void:
 				# 注意：这里只是“记录目标”，不是立刻移动。
 
 				has_pending_target = true
+				_set_current_intent_move(clicked_grid)
 				# 第 280 行：
 				# 标记为“这一轮已经有待执行目标了”。
 
@@ -349,6 +361,7 @@ func _input(event: InputEvent) -> void:
 				# 表示“没有有效移动目标”。
 
 				pending_target = player_grid
+				_set_current_intent_stay()
 				# 第 296 行：
 				# 把待执行目标设置成玩家当前格子本身。
 				# 白话意思：
@@ -470,6 +483,11 @@ func _on_timer_timeout() -> void:
 	# 立刻请求重绘，让感叹号和红色计时器显示出来。
 
 	await get_tree().create_timer(EXECUTE_DURATION).timeout
+	_sync_game_state_from_legacy()
+	var intents: Array[ActionIntent] = []
+	intents.append(_build_player_intent_from_legacy())
+	last_turn_result = turn_resolver.resolve_turn(game_state, intents)
+	last_playback_events = turn_presentation.build_events(last_turn_result)
 	# 第 400 行：
 	# `await` 是“等待”的意思。
 	# 这一句非常重要。
@@ -716,6 +734,71 @@ func _draw_timer_text() -> void:
 		# 操作阶段文字使用蓝色。
 
 	draw_string(timer_font, Vector2(20, 40), display_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, display_color)
+
+
+func _initialize_runtime_state() -> void:
+	game_state = GameState.new()
+	current_player_intent = ActionIntent.new()
+	current_player_intent.actor_id = 1
+	_sync_game_state_from_legacy()
+	_set_current_intent_stay()
+
+
+func _sync_game_state_from_legacy() -> void:
+	if game_state == null:
+		game_state = GameState.new()
+
+	game_state.board_size = Vector2i(GRID_COUNT, GRID_COUNT)
+
+	var player_unit: UnitState = game_state.get_unit_by_id(1)
+	if player_unit == null:
+		player_unit = UnitState.new()
+		player_unit.id = 1
+		player_unit.entry_coins = 0
+		player_unit.coins = 0
+		game_state.units.append(player_unit)
+
+	player_unit.prev_pos = player_unit.pos
+	player_unit.pos = player_grid
+	player_unit.alive = true
+
+
+func _set_current_intent_move(target: Vector2i) -> void:
+	if current_player_intent == null:
+		current_player_intent = ActionIntent.new()
+		current_player_intent.actor_id = 1
+	current_player_intent.type = ActionType.MOVE
+	current_player_intent.target_pos = target
+	current_player_intent.target_bag_id = -1
+	current_player_intent.throw_amount = 0
+
+
+func _set_current_intent_stay() -> void:
+	if current_player_intent == null:
+		current_player_intent = ActionIntent.new()
+		current_player_intent.actor_id = 1
+	current_player_intent.type = ActionType.STAY
+	current_player_intent.target_pos = player_grid
+	current_player_intent.target_bag_id = -1
+	current_player_intent.throw_amount = 0
+
+
+func _build_player_intent_from_legacy() -> ActionIntent:
+	if current_player_intent == null:
+		_set_current_intent_stay()
+
+	var intent := ActionIntent.new()
+	intent.actor_id = current_player_intent.actor_id
+	intent.type = current_player_intent.type
+	intent.target_pos = current_player_intent.target_pos
+	intent.target_bag_id = current_player_intent.target_bag_id
+	intent.throw_amount = current_player_intent.throw_amount
+
+	if not has_pending_target:
+		intent.type = ActionType.STAY
+		intent.target_pos = player_grid
+
+	return intent
 	# 第 598 行：
 	# `draw_string(...)` 是画文字的函数。
 	# 参数可以先这样记：
