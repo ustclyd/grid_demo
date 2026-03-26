@@ -7,6 +7,8 @@ var state_after: GameState
 var intents: Array[ActionIntent] = []
 
 var moved_unit_ids: Array[int] = []
+var conflict1_survivor_unit_ids: Array[int] = []
+var conflict1_defeated_unit_ids: Array[int] = []
 var teleported_unit_ids: Array[int] = []
 var knocked_back_unit_ids: Array[int] = []
 var dead_unit_ids: Array[int] = []
