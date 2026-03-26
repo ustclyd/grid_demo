@@ -24,3 +24,21 @@ var discovered_portal_ids: Array[int] = []
 
 func can_throw() -> bool:
 	return coins > 1
+
+
+func duplicate_state() -> UnitState:
+	var copy := UnitState.new()
+	copy.id = id
+	copy.pos = pos
+	copy.prev_pos = prev_pos
+	copy.coins = coins
+	copy.entry_coins = entry_coins
+	copy.alive = alive
+	copy.won = won
+	copy.forced_stay_turns = forced_stay_turns
+	copy.queued_teleport_to = queued_teleport_to
+	copy.has_queued_teleport = has_queued_teleport
+	copy.queued_exit = queued_exit
+	copy.teleported_this_turn = teleported_this_turn
+	copy.discovered_portal_ids = discovered_portal_ids.duplicate()
+	return copy

@@ -20,3 +20,15 @@ func tick_cooldown() -> void:
 	if cooldown_turns > 0:
 		cooldown_turns -= 1
 	refresh_overheat_state()
+
+
+func duplicate_state() -> PortalPairState:
+	var copy := PortalPairState.new()
+	copy.id = id
+	copy.entry_a = entry_a
+	copy.entry_b = entry_b
+	copy.cooldown_turns = cooldown_turns
+	copy.is_overheated = is_overheated
+	copy.color_id = color_id
+	copy.discovered_by_player_ids = discovered_by_player_ids.duplicate()
+	return copy

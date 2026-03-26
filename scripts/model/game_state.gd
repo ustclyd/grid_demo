@@ -44,3 +44,26 @@ func get_portal_pair_by_id(pair_id: int) -> PortalPairState:
 		if pair.id == pair_id:
 			return pair
 	return null
+
+
+func duplicate_state() -> GameState:
+	var copy := GameState.new()
+	copy.board_size = board_size
+	copy.turn_index = turn_index
+	copy.storm_active = storm_active
+	copy.storm_center = storm_center
+	copy.storm_radius = storm_radius
+	copy.storm_expand_every_turns = storm_expand_every_turns
+	copy.ultimate_bag_id = ultimate_bag_id
+	copy.exit_portal_tile = exit_portal_tile
+
+	for unit in units:
+		copy.units.append(unit.duplicate_state())
+	for bag in bags:
+		copy.bags.append(bag.duplicate_state())
+	for tile in tiles:
+		copy.tiles.append(tile.duplicate_state())
+	for pair in portal_pairs:
+		copy.portal_pairs.append(pair.duplicate_state())
+
+	return copy
