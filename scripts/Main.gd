@@ -18,6 +18,16 @@ const TEST_SCENARIO_MOVER := 1
 const TEST_SCENARIO_THREE_WAY := 2
 const TEST_SCENARIO_SWAP := 3
 const TEST_SCENARIO_TIE := 4
+const TEST_SCENARIO_PICK := 5
+const TEST_SCENARIO_PICK_EMPTY := 6
+const TEST_SCENARIO_PICK_MULTI := 7
+const TEST_SCENARIO_PICK_REMOTE := 8
+const TEST_SCENARIO_PICK_CONFLICT := 9
+const TEST_SCENARIO_THROW := 10
+const TEST_SCENARIO_THROW_LOW_COIN := 11
+const TEST_SCENARIO_THROW_TWO_COINS := 12
+const TEST_SCENARIO_THROW_CONFLICT := 13
+const TEST_SCENARIO_THROW_KNOCKBACK := 14
 
 var player_grid := Vector2i(0, GRID_COUNT - 1)
 var player_alive := true
@@ -31,6 +41,7 @@ var test_mover_grid := Vector2i(3, GRID_COUNT - 1)
 var test_mover_alive := false
 var test_mover_coins := 2
 var test_mover_entry_coins := 2
+var test_bags: Array[BagState] = []
 var pending_target := Vector2i.ZERO
 var has_pending_target := false
 var is_executing := false
@@ -72,7 +83,17 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			var clicked_grid := _screen_to_grid(event.position)
-			if _is_inside_grid(clicked_grid) and _is_adjacent_grid(player_grid, clicked_grid):
+			var clicked_bag_id := _get_clicked_bag_id(event.position)
+			var clicked_any_bag := _is_clicking_any_bag(event.position)
+			if clicked_bag_id != -1:
+				has_pending_target = false
+				pending_target = player_grid
+				_set_current_intent_pick(clicked_bag_id)
+			elif clicked_any_bag:
+				has_pending_target = false
+				pending_target = player_grid
+				_set_current_intent_stay()
+			elif _is_valid_move_target(player_grid, clicked_grid):
 				pending_target = clicked_grid
 				has_pending_target = true
 				_set_current_intent_move(clicked_grid)
@@ -81,6 +102,13 @@ func _input(event: InputEvent) -> void:
 				pending_target = player_grid
 				_set_current_intent_stay()
 			queue_redraw()
+		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			var clicked_grid := _screen_to_grid(event.position)
+			if _is_inside_grid(clicked_grid):
+				has_pending_target = false
+				pending_target = player_grid
+				_set_current_intent_throw(clicked_grid)
+				queue_redraw()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1:
@@ -93,6 +121,26 @@ func _input(event: InputEvent) -> void:
 				_set_test_scenario(TEST_SCENARIO_SWAP)
 			KEY_5:
 				_set_test_scenario(TEST_SCENARIO_TIE)
+			KEY_6:
+				_set_test_scenario(TEST_SCENARIO_PICK)
+			KEY_7:
+				_set_test_scenario(TEST_SCENARIO_PICK_EMPTY)
+			KEY_8:
+				_set_test_scenario(TEST_SCENARIO_PICK_MULTI)
+			KEY_9:
+				_set_test_scenario(TEST_SCENARIO_PICK_REMOTE)
+			KEY_0:
+				_set_test_scenario(TEST_SCENARIO_PICK_CONFLICT)
+			KEY_T:
+				_set_test_scenario(TEST_SCENARIO_THROW)
+			KEY_Y:
+				_set_test_scenario(TEST_SCENARIO_THROW_LOW_COIN)
+			KEY_U:
+				_set_test_scenario(TEST_SCENARIO_THROW_TWO_COINS)
+			KEY_I:
+				_set_test_scenario(TEST_SCENARIO_THROW_CONFLICT)
+			KEY_O:
+				_set_test_scenario(TEST_SCENARIO_THROW_KNOCKBACK)
 
 
 func _draw() -> void:
@@ -123,6 +171,9 @@ func _draw() -> void:
 	if test_mover_alive:
 		var mover_center := _grid_to_screen_center(test_mover_grid)
 		draw_arc(mover_center, CELL_SIZE * 0.14, 0.0, TAU, 48, TEST_MOVER_COLOR, PLAYER_RING_WIDTH)
+
+	for bag in test_bags:
+		_draw_bag(bag)
 
 	_draw_timer_text()
 	_draw_debug_panel()
@@ -187,6 +238,32 @@ func _is_adjacent_grid(from_grid: Vector2i, to_grid: Vector2i) -> bool:
 	return delta_x <= 1 and delta_y <= 1
 
 
+func _is_valid_move_target(from_grid: Vector2i, to_grid: Vector2i) -> bool:
+	return _is_inside_grid(to_grid) and _is_adjacent_grid(from_grid, to_grid)
+
+
+func _is_valid_throw_target(from_grid: Vector2i, to_grid: Vector2i) -> bool:
+	if not _is_inside_grid(to_grid):
+		return false
+
+	var delta := to_grid - from_grid
+	var abs_x := absi(delta.x)
+	var abs_y := absi(delta.y)
+
+	if abs_x == 0 and abs_y == 0:
+		return false
+
+	var max_delta := maxi(abs_x, abs_y)
+	if max_delta < 1 or max_delta > 2:
+		return false
+
+	return (
+		abs_x == 0
+		or abs_y == 0
+		or abs_x == abs_y
+	)
+
+
 func _draw_alert_mark(player_center: Vector2) -> void:
 	var mark_top := player_center + Vector2(0, -CELL_SIZE * 0.75)
 	var mark_bottom := player_center + Vector2(0, -CELL_SIZE * 0.45)
@@ -222,13 +299,21 @@ func _draw_timer_text() -> void:
 func _draw_debug_panel() -> void:
 	var lines := [
 		"Scenario: %s" % _get_test_scenario_name(),
-		"Keys: 1=Stayer 2=Mover 3=ThreeWay 4=Swap 5=Tie"
+		"Keys: 1-0 Pick/Move tests, T/Y/U/I/O = Throw tests",
+		"Player coins: %d" % player_coins,
+		"Intent: %s throw=%d" % [current_player_intent.type if current_player_intent != null else "null", current_player_intent.throw_amount if current_player_intent != null else 0]
 	]
 
 	if last_turn_result != null:
 		lines.append("Moved: %s" % _format_int_array(last_turn_result.moved_unit_ids))
+		lines.append("Picked: %s" % str(last_turn_result.picked_bag_records))
+		lines.append("Thrown: %s" % str(last_turn_result.thrown_bag_records))
 		lines.append("Survivors: %s" % _format_int_array(last_turn_result.conflict1_survivor_unit_ids))
 		lines.append("Defeated: %s" % _format_int_array(last_turn_result.conflict1_defeated_unit_ids))
+		lines.append("KnockedBack: %s" % _format_int_array(last_turn_result.knocked_back_unit_ids))
+		lines.append("Conflict2 survivors: %s" % _format_int_array(last_turn_result.conflict2_survivor_unit_ids))
+		lines.append("Conflict2 defeated: %s" % _format_int_array(last_turn_result.conflict2_defeated_unit_ids))
+		lines.append("ForcedStay: %s" % _format_int_array(last_turn_result.forced_stay_unit_ids))
 		lines.append("Dead: %s" % _format_int_array(last_turn_result.dead_unit_ids))
 
 	var start_pos := Vector2(20, 80)
@@ -298,6 +383,10 @@ func _sync_game_state_from_legacy() -> void:
 	test_mover_unit.alive = test_mover_alive
 	test_mover_unit.won = false
 
+	game_state.bags.clear()
+	for test_bag in test_bags:
+		game_state.bags.append(test_bag.duplicate_state())
+
 
 func _apply_turn_result_to_legacy() -> void:
 	if last_turn_result == null:
@@ -310,6 +399,7 @@ func _apply_turn_result_to_legacy() -> void:
 	if player_unit != null:
 		player_grid = player_unit.pos
 		player_alive = player_unit.alive
+		player_coins = player_unit.coins
 
 	var test_enemy_unit := last_turn_result.state_after.get_unit_by_id(2)
 	if test_enemy_unit != null:
@@ -320,6 +410,10 @@ func _apply_turn_result_to_legacy() -> void:
 	if test_mover_unit != null:
 		test_mover_grid = test_mover_unit.pos
 		test_mover_alive = test_mover_unit.alive
+
+	test_bags.clear()
+	for bag in last_turn_result.state_after.bags:
+		test_bags.append(bag.duplicate_state())
 
 	game_state = last_turn_result.state_after
 
@@ -346,6 +440,37 @@ func _set_current_intent_stay() -> void:
 	current_player_intent.throw_amount = 0
 
 
+func _set_current_intent_pick(bag_id: int) -> void:
+	if current_player_intent == null:
+		current_player_intent = ActionIntent.new()
+		current_player_intent.actor_id = 1
+
+	if not _is_valid_pick_target(bag_id):
+		_set_current_intent_stay()
+		return
+
+	current_player_intent.type = ActionType.PICK
+	current_player_intent.target_pos = player_grid
+	current_player_intent.target_bag_id = bag_id
+	current_player_intent.throw_amount = 0
+
+
+func _set_current_intent_throw(target: Vector2i) -> void:
+	if current_player_intent == null:
+		current_player_intent = ActionIntent.new()
+		current_player_intent.actor_id = 1
+
+	var throw_amount := _get_throw_amount(player_coins)
+	if throw_amount <= 0 or not _is_valid_throw_target(player_grid, target):
+		_set_current_intent_stay()
+		return
+
+	current_player_intent.type = ActionType.THROW
+	current_player_intent.target_pos = target
+	current_player_intent.target_bag_id = -1
+	current_player_intent.throw_amount = throw_amount
+
+
 func _build_player_intent_from_legacy() -> ActionIntent:
 	if current_player_intent == null:
 		_set_current_intent_stay()
@@ -356,6 +481,9 @@ func _build_player_intent_from_legacy() -> ActionIntent:
 	intent.target_pos = current_player_intent.target_pos
 	intent.target_bag_id = current_player_intent.target_bag_id
 	intent.throw_amount = current_player_intent.throw_amount
+
+	if current_player_intent.type == ActionType.PICK or current_player_intent.type == ActionType.THROW:
+		return intent
 
 	if not has_pending_target:
 		intent.type = ActionType.STAY
@@ -395,6 +523,15 @@ func _build_test_mover_intent() -> ActionIntent:
 		TEST_SCENARIO_TIE:
 			intent.type = ActionType.MOVE
 			intent.target_pos = Vector2i(1, GRID_COUNT - 1)
+		TEST_SCENARIO_PICK_CONFLICT:
+			intent.type = ActionType.MOVE
+			intent.target_pos = Vector2i(0, GRID_COUNT - 1)
+		TEST_SCENARIO_THROW_CONFLICT:
+			intent.type = ActionType.MOVE
+			intent.target_pos = Vector2i(0, GRID_COUNT - 1)
+		TEST_SCENARIO_THROW_KNOCKBACK:
+			intent.type = ActionType.MOVE
+			intent.target_pos = Vector2i(1, GRID_COUNT - 1)
 
 	return intent
 
@@ -411,6 +548,26 @@ func _get_test_scenario_name() -> String:
 			return "Swap"
 		TEST_SCENARIO_TIE:
 			return "Tie"
+		TEST_SCENARIO_PICK:
+			return "Pick"
+		TEST_SCENARIO_PICK_EMPTY:
+			return "PickEmpty"
+		TEST_SCENARIO_PICK_MULTI:
+			return "PickMulti"
+		TEST_SCENARIO_PICK_REMOTE:
+			return "PickRemote"
+		TEST_SCENARIO_PICK_CONFLICT:
+			return "PickConflict"
+		TEST_SCENARIO_THROW:
+			return "Throw"
+		TEST_SCENARIO_THROW_LOW_COIN:
+			return "ThrowLowCoin"
+		TEST_SCENARIO_THROW_TWO_COINS:
+			return "ThrowTwoCoins"
+		TEST_SCENARIO_THROW_CONFLICT:
+			return "ThrowConflict"
+		TEST_SCENARIO_THROW_KNOCKBACK:
+			return "ThrowKnockback"
 	return "Unknown"
 
 
@@ -433,6 +590,7 @@ func _set_test_scenario(scenario_id: int) -> void:
 	test_mover_alive = false
 	test_mover_coins = 2
 	test_mover_entry_coins = 2
+	test_bags.clear()
 
 	match scenario_id:
 		TEST_SCENARIO_STAYER:
@@ -465,8 +623,170 @@ func _set_test_scenario(scenario_id: int) -> void:
 			test_mover_alive = true
 			test_mover_coins = 1
 			test_mover_entry_coins = 1
+		TEST_SCENARIO_PICK:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
+			test_mover_alive = false
+			_add_test_bag(1001, player_grid, 3)
+		TEST_SCENARIO_PICK_EMPTY:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
+			test_mover_alive = false
+		TEST_SCENARIO_PICK_MULTI:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
+			test_mover_alive = false
+			_add_test_bag(1001, player_grid, 1)
+			_add_test_bag(1002, player_grid, 3)
+			_add_test_bag(1003, player_grid, 5)
+		TEST_SCENARIO_PICK_REMOTE:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
+			test_mover_alive = false
+			_add_test_bag(1001, Vector2i(1, GRID_COUNT - 1), 3)
+		TEST_SCENARIO_PICK_CONFLICT:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(1, GRID_COUNT - 1)
+			test_mover_alive = true
+			test_mover_coins = 1
+			test_mover_entry_coins = 1
+			_add_test_bag(1001, player_grid, 3)
+		TEST_SCENARIO_THROW:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
+			test_mover_alive = false
+		TEST_SCENARIO_THROW_LOW_COIN:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 1
+			player_entry_coins = 1
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
+			test_mover_alive = false
+		TEST_SCENARIO_THROW_TWO_COINS:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 2
+			player_entry_coins = 2
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
+			test_mover_alive = false
+		TEST_SCENARIO_THROW_CONFLICT:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(1, GRID_COUNT - 1)
+			test_mover_alive = true
+			test_mover_coins = 1
+			test_mover_entry_coins = 1
+		TEST_SCENARIO_THROW_KNOCKBACK:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(2, GRID_COUNT - 1)
+			test_mover_alive = true
+			test_mover_coins = 1
+			test_mover_entry_coins = 1
 
 	_set_current_intent_stay()
 	if game_state != null:
 		_sync_game_state_from_legacy()
 	queue_redraw()
+
+
+func _add_test_bag(bag_id: int, grid: Vector2i, coins: int) -> void:
+	var bag := BagState.new()
+	bag.id = bag_id
+	bag.pos = grid
+	bag.coins = coins
+	test_bags.append(bag)
+
+
+func _get_throw_amount(coins: int) -> int:
+	if coins <= 1:
+		return 0
+	return int(floor(float(coins) / 2.0))
+
+
+func _is_valid_pick_target(bag_id: int) -> bool:
+	var bag := _get_test_bag_by_id(bag_id)
+	return bag != null and bag.pos == player_grid
+
+
+func _get_clicked_bag_id(screen_position: Vector2) -> int:
+	for bag in test_bags:
+		if bag.pos != player_grid:
+			continue
+
+		var center := _get_bag_draw_center(bag)
+		if center.distance_to(screen_position) <= CELL_SIZE * 0.11:
+			return bag.id
+
+	return -1
+
+
+func _get_test_bag_by_id(bag_id: int) -> BagState:
+	for bag in test_bags:
+		if bag.id == bag_id:
+			return bag
+	return null
+
+
+func _is_clicking_any_bag(screen_position: Vector2) -> bool:
+	for bag in test_bags:
+		var center := _get_bag_draw_center(bag)
+		if center.distance_to(screen_position) <= CELL_SIZE * 0.11:
+			return true
+	return false
+
+
+func _draw_bag(bag: BagState) -> void:
+	var center := _get_bag_draw_center(bag)
+	draw_circle(center, CELL_SIZE * 0.08, Color(0.95, 0.8, 0.2))
+	draw_string(
+		timer_font,
+		center + Vector2(CELL_SIZE * 0.1, CELL_SIZE * 0.03),
+		str(bag.coins),
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		18,
+		Color(0.95, 0.9, 0.7)
+	)
+
+
+func _get_bag_draw_center(bag: BagState) -> Vector2:
+	var same_cell_bags: Array[BagState] = []
+	for candidate in test_bags:
+		if candidate.pos == bag.pos:
+			same_cell_bags.append(candidate)
+
+	same_cell_bags.sort_custom(func(a: BagState, b: BagState): return a.id < b.id)
+
+	var bag_index := 0
+	for index in range(same_cell_bags.size()):
+		if same_cell_bags[index].id == bag.id:
+			bag_index = index
+			break
+
+	var base_center := _grid_to_screen_center(bag.pos)
+	var start_x := -CELL_SIZE * 0.22
+	var step_x := CELL_SIZE * 0.18
+	return base_center + Vector2(start_x + bag_index * step_x, CELL_SIZE * 0.18)
