@@ -13,6 +13,7 @@ var conflict2_survivor_unit_ids: Array[int] = []
 var conflict2_defeated_unit_ids: Array[int] = []
 var teleported_unit_ids: Array[int] = []
 var knocked_back_unit_ids: Array[int] = []
+var knocked_back_records: Array[Dictionary] = []
 var dead_unit_ids: Array[int] = []
 
 var picked_bag_records: Array[Dictionary] = []

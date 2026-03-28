@@ -13,6 +13,8 @@ const LINE_WIDTH := 2.0
 const PLAYER_RING_WIDTH := 3.0
 const TURN_INTERVAL := 5.0
 const EXECUTE_DURATION := 1.0
+const DEBUG_TEXT_SIZE := 16
+const DEBUG_LINE_HEIGHT := 18.0
 const TEST_SCENARIO_STAYER := 0
 const TEST_SCENARIO_MOVER := 1
 const TEST_SCENARIO_THREE_WAY := 2
@@ -28,6 +30,8 @@ const TEST_SCENARIO_THROW_LOW_COIN := 11
 const TEST_SCENARIO_THROW_TWO_COINS := 12
 const TEST_SCENARIO_THROW_CONFLICT := 13
 const TEST_SCENARIO_THROW_KNOCKBACK := 14
+const TEST_SCENARIO_THROW_CONFLICT2 := 15
+const TEST_SCENARIO_THROW_MULTI_HIT := 16
 
 var player_grid := Vector2i(0, GRID_COUNT - 1)
 var player_alive := true
@@ -141,6 +145,10 @@ func _input(event: InputEvent) -> void:
 				_set_test_scenario(TEST_SCENARIO_THROW_CONFLICT)
 			KEY_O:
 				_set_test_scenario(TEST_SCENARIO_THROW_KNOCKBACK)
+			KEY_P:
+				_set_test_scenario(TEST_SCENARIO_THROW_CONFLICT2)
+			KEY_G:
+				_set_test_scenario(TEST_SCENARIO_THROW_MULTI_HIT)
 
 
 func _draw() -> void:
@@ -160,6 +168,7 @@ func _draw() -> void:
 	if player_alive:
 		var player_center := _grid_to_screen_center(player_grid)
 		draw_arc(player_center, CELL_SIZE * 0.14, 0.0, TAU, 48, PLAYER_COLOR, PLAYER_RING_WIDTH)
+		_draw_unit_overlay(1, player_center, PLAYER_COLOR)
 
 		if is_executing:
 			_draw_alert_mark(player_center)
@@ -167,10 +176,12 @@ func _draw() -> void:
 	if test_enemy_alive:
 		var enemy_center := _grid_to_screen_center(test_enemy_grid)
 		draw_arc(enemy_center, CELL_SIZE * 0.14, 0.0, TAU, 48, TEST_ENEMY_COLOR, PLAYER_RING_WIDTH)
+		_draw_unit_overlay(2, enemy_center, TEST_ENEMY_COLOR)
 
 	if test_mover_alive:
 		var mover_center := _grid_to_screen_center(test_mover_grid)
 		draw_arc(mover_center, CELL_SIZE * 0.14, 0.0, TAU, 48, TEST_MOVER_COLOR, PLAYER_RING_WIDTH)
+		_draw_unit_overlay(3, mover_center, TEST_MOVER_COLOR)
 
 	for bag in test_bags:
 		_draw_bag(bag)
@@ -297,36 +308,87 @@ func _draw_timer_text() -> void:
 
 
 func _draw_debug_panel() -> void:
-	var lines := [
-		"Scenario: %s" % _get_test_scenario_name(),
-		"Keys: 1-0 Pick/Move tests, T/Y/U/I/O = Throw tests",
-		"Player coins: %d" % player_coins,
-		"Intent: %s throw=%d" % [current_player_intent.type if current_player_intent != null else "null", current_player_intent.throw_amount if current_player_intent != null else 0]
-	]
+	var lines := []
+	lines.append("Scenario: %s  Turn: %d  Phase: %s" % [
+		_get_test_scenario_name(),
+		game_state.turn_index if game_state != null else 0,
+		"Execute" if is_executing else "Input"
+	])
+	lines.append("Keys: 1-0 Pick/Move tests, T/Y/U/I/O/P/G = Throw tests")
+	lines.append("")
+	lines.append("Units")
+	lines.append(_format_unit_status_line(1, "P1"))
+	lines.append(_format_unit_status_line(2, "E2"))
+	lines.append(_format_unit_status_line(3, "E3"))
+	lines.append("")
+	lines.append("Last Turn")
 
-	if last_turn_result != null:
+	if last_turn_result == null:
+		lines.append("No turn result yet.")
+	else:
 		lines.append("Moved: %s" % _format_int_array(last_turn_result.moved_unit_ids))
-		lines.append("Picked: %s" % str(last_turn_result.picked_bag_records))
-		lines.append("Thrown: %s" % str(last_turn_result.thrown_bag_records))
-		lines.append("Survivors: %s" % _format_int_array(last_turn_result.conflict1_survivor_unit_ids))
-		lines.append("Defeated: %s" % _format_int_array(last_turn_result.conflict1_defeated_unit_ids))
-		lines.append("KnockedBack: %s" % _format_int_array(last_turn_result.knocked_back_unit_ids))
-		lines.append("Conflict2 survivors: %s" % _format_int_array(last_turn_result.conflict2_survivor_unit_ids))
-		lines.append("Conflict2 defeated: %s" % _format_int_array(last_turn_result.conflict2_defeated_unit_ids))
-		lines.append("ForcedStay: %s" % _format_int_array(last_turn_result.forced_stay_unit_ids))
+		lines.append("Picked: %s" % _format_record_list(last_turn_result.picked_bag_records))
+		lines.append("Thrown: %s" % _format_throw_records(last_turn_result.thrown_bag_records))
+		lines.append("Conflict1: survivors=%s defeated=%s" % [
+			_format_int_array(last_turn_result.conflict1_survivor_unit_ids),
+			_format_int_array(last_turn_result.conflict1_defeated_unit_ids)
+		])
+		lines.append("Knockback: %s" % _format_knockback_records(last_turn_result.knocked_back_records))
+		lines.append("Conflict2: survivors=%s defeated=%s" % [
+			_format_int_array(last_turn_result.conflict2_survivor_unit_ids),
+			_format_int_array(last_turn_result.conflict2_defeated_unit_ids)
+		])
+		lines.append("ForcedStay next turn: %s" % _format_int_array(last_turn_result.forced_stay_unit_ids))
 		lines.append("Dead: %s" % _format_int_array(last_turn_result.dead_unit_ids))
 
 	var start_pos := Vector2(20, 80)
-	for index in range(lines.size()):
+	var line_index := 0
+	for line in lines:
+		if line == "":
+			line_index += 1
+			continue
 		draw_string(
 			timer_font,
-			start_pos + Vector2(0, index * 24),
-			lines[index],
+			start_pos + Vector2(0, line_index * DEBUG_LINE_HEIGHT),
+			line,
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
-			20,
+			DEBUG_TEXT_SIZE,
 			Color(0.92, 0.92, 0.92)
 		)
+		line_index += 1
+
+
+func _draw_unit_overlay(unit_id: int, center: Vector2, color: Color) -> void:
+	var unit := _get_runtime_unit(unit_id)
+	if unit == null:
+		return
+
+	if unit.forced_stay_turns > 0:
+		draw_string(
+			timer_font,
+			center + Vector2(-CELL_SIZE * 0.16, -CELL_SIZE * 0.22),
+			"FS%d" % unit.forced_stay_turns,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			14,
+			color
+		)
+
+	if last_turn_result != null:
+		for record in last_turn_result.knocked_back_records:
+			if int(record.get("unit_id", -1)) != unit_id:
+				continue
+			draw_string(
+				timer_font,
+				center + Vector2(-CELL_SIZE * 0.18, -CELL_SIZE * 0.36),
+				"KB",
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1,
+				14,
+				ALERT_COLOR
+			)
+			return
 
 
 func _initialize_runtime_state() -> void:
@@ -499,6 +561,15 @@ func _build_test_enemy_intent() -> ActionIntent:
 	intent.target_pos = test_enemy_grid
 	intent.target_bag_id = -1
 	intent.throw_amount = 0
+
+	if current_test_scenario == TEST_SCENARIO_THROW_CONFLICT2:
+		intent.type = ActionType.MOVE
+		intent.target_pos = Vector2i(1, GRID_COUNT - 1)
+	elif current_test_scenario == TEST_SCENARIO_THROW_MULTI_HIT:
+		intent.type = ActionType.THROW
+		intent.target_pos = Vector2i(2, GRID_COUNT - 1)
+		intent.throw_amount = _get_throw_amount(test_enemy_coins)
+
 	return intent
 
 
@@ -532,6 +603,12 @@ func _build_test_mover_intent() -> ActionIntent:
 		TEST_SCENARIO_THROW_KNOCKBACK:
 			intent.type = ActionType.MOVE
 			intent.target_pos = Vector2i(1, GRID_COUNT - 1)
+		TEST_SCENARIO_THROW_CONFLICT2:
+			intent.type = ActionType.MOVE
+			intent.target_pos = Vector2i(2, GRID_COUNT - 1)
+		TEST_SCENARIO_THROW_MULTI_HIT:
+			intent.type = ActionType.MOVE
+			intent.target_pos = Vector2i(2, GRID_COUNT - 1)
 
 	return intent
 
@@ -568,6 +645,10 @@ func _get_test_scenario_name() -> String:
 			return "ThrowConflict"
 		TEST_SCENARIO_THROW_KNOCKBACK:
 			return "ThrowKnockback"
+		TEST_SCENARIO_THROW_CONFLICT2:
+			return "ThrowConflict2"
+		TEST_SCENARIO_THROW_MULTI_HIT:
+			return "ThrowMultiHit"
 	return "Unknown"
 
 
@@ -575,6 +656,99 @@ func _format_int_array(values: Array[int]) -> String:
 	if values.is_empty():
 		return "[]"
 	return str(values)
+
+
+func _format_vec2i(pos: Vector2i) -> String:
+	return "(%d,%d)" % [pos.x, pos.y]
+
+
+func _format_record_list(records: Array[Dictionary]) -> String:
+	if records.is_empty():
+		return "[]"
+	return str(records)
+
+
+func _format_throw_records(records: Array[Dictionary]) -> String:
+	if records.is_empty():
+		return "[]"
+
+	var parts: Array[String] = []
+	for record in records:
+		var unit_id := int(record.get("unit_id", -1))
+		var coins := int(record.get("coins", 0))
+		var from_pos: Vector2i = record.get("from", Vector2i.ZERO)
+		var to_pos: Vector2i = record.get("to", Vector2i.ZERO)
+		parts.append("U%d %s->%s $%d" % [unit_id, _format_vec2i(from_pos), _format_vec2i(to_pos), coins])
+	return "[" + ", ".join(parts) + "]"
+
+
+func _format_knockback_records(records: Array[Dictionary]) -> String:
+	if records.is_empty():
+		return "[]"
+
+	var parts: Array[String] = []
+	for record in records:
+		var unit_id := int(record.get("unit_id", -1))
+		var from_pos: Vector2i = record.get("from", Vector2i.ZERO)
+		var to_pos: Vector2i = record.get("to", Vector2i.ZERO)
+		parts.append("U%d %s->%s" % [unit_id, _format_vec2i(from_pos), _format_vec2i(to_pos)])
+	return "[" + ", ".join(parts) + "]"
+
+
+func _format_unit_status_line(unit_id: int, label: String) -> String:
+	var unit := _get_runtime_unit(unit_id)
+	if unit == null:
+		return "%s: <none>" % label
+
+	var intent := _get_runtime_intent(unit_id)
+	var intent_text := _format_intent_summary(intent)
+	return "%s pos=%s coins=%d entry=%d alive=%s fs=%d intent=%s" % [
+		label,
+		_format_vec2i(unit.pos),
+		unit.coins,
+		unit.entry_coins,
+		"Y" if unit.alive else "N",
+		unit.forced_stay_turns,
+		intent_text
+	]
+
+
+func _get_runtime_unit(unit_id: int) -> UnitState:
+	if game_state == null:
+		return null
+	return game_state.get_unit_by_id(unit_id)
+
+
+func _get_runtime_intent(unit_id: int) -> ActionIntent:
+	match unit_id:
+		1:
+			return _build_player_intent_from_legacy()
+		2:
+			if not test_enemy_alive:
+				return null
+			return _build_test_enemy_intent()
+		3:
+			if not test_mover_alive:
+				return null
+			return _build_test_mover_intent()
+	return null
+
+
+func _format_intent_summary(intent: ActionIntent) -> String:
+	if intent == null:
+		return "null"
+
+	match intent.type:
+		ActionType.MOVE:
+			return "MOVE%s" % _format_vec2i(intent.target_pos)
+		ActionType.PICK:
+			return "PICK bag=%d" % intent.target_bag_id
+		ActionType.THROW:
+			return "THROW%s $%d" % [_format_vec2i(intent.target_pos), intent.throw_amount]
+		ActionType.STAY:
+			return "STAY"
+
+	return String(intent.type)
 
 
 func _set_test_scenario(scenario_id: int) -> void:
@@ -702,6 +876,30 @@ func _set_test_scenario(scenario_id: int) -> void:
 			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
 			test_enemy_alive = false
 			test_mover_grid = Vector2i(2, GRID_COUNT - 1)
+			test_mover_alive = true
+			test_mover_coins = 1
+			test_mover_entry_coins = 1
+		TEST_SCENARIO_THROW_CONFLICT2:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(2, GRID_COUNT - 1)
+			test_enemy_alive = true
+			test_enemy_coins = 0
+			test_enemy_entry_coins = 0
+			test_mover_grid = Vector2i(1, GRID_COUNT - 1)
+			test_mover_alive = true
+			test_mover_coins = 1
+			test_mover_entry_coins = 1
+		TEST_SCENARIO_THROW_MULTI_HIT:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(2, GRID_COUNT - 3)
+			test_enemy_alive = true
+			test_enemy_coins = 5
+			test_enemy_entry_coins = 5
+			test_mover_grid = Vector2i(1, GRID_COUNT - 1)
 			test_mover_alive = true
 			test_mover_coins = 1
 			test_mover_entry_coins = 1

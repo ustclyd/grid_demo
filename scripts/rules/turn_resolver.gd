@@ -144,6 +144,11 @@ func _resolve_throw_knockback_phase(state_after: GameState, result: TurnResult) 
 			continue
 
 		result.knocked_back_unit_ids.append(survivor.id)
+		result.knocked_back_records.append({
+			"unit_id": survivor.id,
+			"from": survivor.pos,
+			"to": survivor.prev_pos,
+		})
 		survivor.pos = survivor.prev_pos
 		knocked_back_targets[survivor.id] = survivor.pos
 
