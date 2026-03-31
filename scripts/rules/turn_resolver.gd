@@ -99,27 +99,74 @@ func _tick_portal_cooldowns(state_after: GameState) -> void:
 
 
 func _resolve_queued_exits(state_after: GameState, result: TurnResult) -> void:
+	var queued_units_by_pos := {}
 	for unit in state_after.units:
 		if not unit.alive or unit.won:
 			continue
 		if not unit.queued_exit:
 			continue
 
-		var exit_from := unit.pos
-		unit.queued_exit = false
-		unit.won = true
-		unit.alive = false
+		var unit_key := _pos_key(unit.pos)
+		if not queued_units_by_pos.has(unit_key):
+			queued_units_by_pos[unit_key] = []
+		queued_units_by_pos[unit_key].append(unit)
 
-		if not result.exited_unit_ids.has(unit.id):
-			result.exited_unit_ids.append(unit.id)
-		result.exit_records.append({
-			"unit_id": unit.id,
-			"from": exit_from,
-		})
+	var queued_bags_by_pos := {}
+	for bag in state_after.bags:
+		if not bag.queued_exit:
+			continue
+
+		var bag_key := _pos_key(bag.pos)
+		if not queued_bags_by_pos.has(bag_key):
+			queued_bags_by_pos[bag_key] = []
+		queued_bags_by_pos[bag_key].append(bag)
+
+	var all_exit_keys := {}
+	for key in queued_units_by_pos.keys():
+		all_exit_keys[key] = true
+	for key in queued_bags_by_pos.keys():
+		all_exit_keys[key] = true
+
+	var bags_to_remove: Array[BagState] = []
+	for key in all_exit_keys.keys():
+		var units_at_pos: Array = queued_units_by_pos.get(key, [])
+		var bags_at_pos: Array = queued_bags_by_pos.get(key, [])
+		var collector: UnitState = null
+
+		if units_at_pos.size() > 0:
+			collector = _pick_exit_coin_collector(units_at_pos)
+
+		for bag in bags_at_pos:
+			bag.queued_exit = false
+			if collector != null:
+				collector.coins += bag.coins
+			result.exit_records.append({
+				"bag_id": bag.id,
+				"from": bag.pos,
+				"coins": bag.coins,
+			})
+			bags_to_remove.append(bag)
+
+		for unit in units_at_pos:
+			var exit_from := unit.pos
+			unit.queued_exit = false
+
+			if not result.exited_unit_ids.has(unit.id):
+				result.exited_unit_ids.append(unit.id)
+			result.exit_records.append({
+				"unit_id": unit.id,
+				"from": exit_from,
+				"coins": unit.coins,
+			})
+			unit.won = true
+			unit.alive = false
+
+	for bag in bags_to_remove:
+		state_after.bags.erase(bag)
 
 
 func _refresh_exit_portal_if_used(state_after: GameState, result: TurnResult) -> void:
-	if result.exited_unit_ids.is_empty():
+	if result.exit_records.is_empty():
 		return
 
 	var old_exit_pos := state_after.exit_portal_tile
@@ -188,6 +235,47 @@ func _resolve_queued_portals(state_after: GameState, result: TurnResult) -> void
 			continue
 		used_pair.cooldown_turns = 3
 		used_pair.refresh_overheat_state()
+		if not result.overheated_portal_pair_ids.has(pair_id):
+			result.overheated_portal_pair_ids.append(pair_id)
+
+	for bag in state_after.bags:
+		if not bag.has_queued_teleport:
+			continue
+
+		var source_pos := bag.pos
+		var target_pos := bag.queued_teleport_to
+		var tile := state_after.get_tile_at(source_pos)
+		if tile == null or tile.tile_type != TileType.PORTAL:
+			bag.has_queued_teleport = false
+			bag.queued_teleport_to = Vector2i.ZERO
+			continue
+
+		var pair := state_after.get_portal_pair_by_id(tile.portal_pair_id)
+		if pair == null:
+			bag.has_queued_teleport = false
+			bag.queued_teleport_to = Vector2i.ZERO
+			continue
+
+		bag.pos = target_pos
+		bag.has_queued_teleport = false
+		bag.queued_teleport_to = Vector2i.ZERO
+
+		result.teleport_records.append({
+			"bag_id": bag.id,
+			"pair_id": pair.id,
+			"from": source_pos,
+			"to": target_pos,
+			"coins": bag.coins,
+		})
+		if not used_pair_ids.has(pair.id):
+			used_pair_ids.append(pair.id)
+
+	for pair_id in used_pair_ids:
+		var used_pair_after_bags := state_after.get_portal_pair_by_id(pair_id)
+		if used_pair_after_bags == null:
+			continue
+		used_pair_after_bags.cooldown_turns = 3
+		used_pair_after_bags.refresh_overheat_state()
 		if not result.overheated_portal_pair_ids.has(pair_id):
 			result.overheated_portal_pair_ids.append(pair_id)
 
@@ -371,6 +459,27 @@ func _resolve_portal_reservations(state_after: GameState, result: TurnResult) ->
 			"to": target,
 		})
 
+	for bag in state_after.bags:
+		var tile := state_after.get_tile_at(bag.pos)
+		if tile == null or tile.tile_type != TileType.PORTAL:
+			continue
+
+		var pair := state_after.get_portal_pair_by_id(tile.portal_pair_id)
+		if pair == null or pair.is_overheated:
+			continue
+
+		var target := pair.entry_b if pair.entry_a == bag.pos else pair.entry_a
+		bag.has_queued_teleport = true
+		bag.queued_teleport_to = target
+
+		result.portal_ready_records.append({
+			"bag_id": bag.id,
+			"pair_id": pair.id,
+			"from": bag.pos,
+			"to": target,
+			"coins": bag.coins,
+		})
+
 
 func _resolve_exit_reservations(state_after: GameState, result: TurnResult) -> void:
 	for unit in state_after.units:
@@ -389,6 +498,18 @@ func _resolve_exit_reservations(state_after: GameState, result: TurnResult) -> v
 		result.exit_ready_records.append({
 			"unit_id": unit.id,
 			"from": unit.pos,
+		})
+
+	for bag in state_after.bags:
+		var tile := state_after.get_tile_at(bag.pos)
+		if tile == null or tile.tile_type != TileType.EXIT_PORTAL:
+			continue
+
+		bag.queued_exit = true
+		result.exit_ready_records.append({
+			"bag_id": bag.id,
+			"from": bag.pos,
+			"coins": bag.coins,
 		})
 
 
@@ -526,6 +647,15 @@ func _compare_unit_priority(a: UnitState, b: UnitState) -> int:
 		return -1 if a.id < b.id else 1
 
 	return 0
+
+
+func _pick_exit_coin_collector(units_at_pos: Array) -> UnitState:
+	var collector: UnitState = units_at_pos[0]
+	for index in range(1, units_at_pos.size()):
+		var challenger: UnitState = units_at_pos[index]
+		if challenger.id < collector.id:
+			collector = challenger
+	return collector
 
 
 func _pos_key(pos: Vector2i) -> String:

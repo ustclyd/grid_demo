@@ -37,6 +37,9 @@ const TEST_SCENARIO_PORTAL_CONFLICT := 18
 const TEST_SCENARIO_EXIT_BASIC := 19
 const TEST_SCENARIO_EXIT_CONFLICT := 20
 const TEST_SCENARIO_EXIT_QUEUED := 21
+const TEST_SCENARIO_PORTAL_BAG := 22
+const TEST_SCENARIO_EXIT_BAG := 23
+const TEST_SCENARIO_EXIT_UNIT_BAG := 24
 
 var player_grid := Vector2i(0, GRID_COUNT - 1)
 var player_alive := true
@@ -166,6 +169,12 @@ func _input(event: InputEvent) -> void:
 				_set_test_scenario(TEST_SCENARIO_EXIT_CONFLICT)
 			KEY_Q:
 				_set_test_scenario(TEST_SCENARIO_EXIT_QUEUED)
+			KEY_W:
+				_set_test_scenario(TEST_SCENARIO_PORTAL_BAG)
+			KEY_E:
+				_set_test_scenario(TEST_SCENARIO_EXIT_BAG)
+			KEY_R:
+				_set_test_scenario(TEST_SCENARIO_EXIT_UNIT_BAG)
 
 
 func _draw() -> void:
@@ -337,7 +346,7 @@ func _draw_debug_panel() -> void:
 		game_state.turn_index if game_state != null else 0,
 		"Execute" if is_executing else "Input"
 	])
-	lines.append("Keys: 1-0 Pick/Move, T/Y/U/I/O/P/G Throw, H/J Portal, K/L/Q Exit")
+	lines.append("Keys: 1-0 Pick/Move, T/Y/U/I/O/P/G Throw, H/J/W Portal, K/L/Q/E/R Exit")
 	lines.append("")
 	lines.append("Units")
 	lines.append(_format_unit_status_line(1, "P1"))
@@ -713,6 +722,12 @@ func _get_test_scenario_name() -> String:
 			return "ExitConflict"
 		TEST_SCENARIO_EXIT_QUEUED:
 			return "ExitQueued"
+		TEST_SCENARIO_PORTAL_BAG:
+			return "PortalBag"
+		TEST_SCENARIO_EXIT_BAG:
+			return "ExitBag"
+		TEST_SCENARIO_EXIT_UNIT_BAG:
+			return "ExitUnitBag"
 	return "Unknown"
 
 
@@ -778,11 +793,16 @@ func _format_portal_records(records: Array[Dictionary]) -> String:
 
 	var parts: Array[String] = []
 	for record in records:
-		var unit_id := int(record.get("unit_id", -1))
 		var pair_id := int(record.get("pair_id", -1))
 		var from_pos: Vector2i = record.get("from", Vector2i.ZERO)
 		var to_pos: Vector2i = record.get("to", Vector2i.ZERO)
-		parts.append("U%d P%d %s->%s" % [unit_id, pair_id, _format_vec2i(from_pos), _format_vec2i(to_pos)])
+		if record.has("unit_id"):
+			var unit_id := int(record.get("unit_id", -1))
+			parts.append("U%d P%d %s->%s" % [unit_id, pair_id, _format_vec2i(from_pos), _format_vec2i(to_pos)])
+		else:
+			var bag_id := int(record.get("bag_id", -1))
+			var coins := int(record.get("coins", 0))
+			parts.append("B%d P%d %s->%s $%d" % [bag_id, pair_id, _format_vec2i(from_pos), _format_vec2i(to_pos), coins])
 	return "[" + ", ".join(parts) + "]"
 
 
@@ -792,9 +812,18 @@ func _format_exit_records(records: Array[Dictionary]) -> String:
 
 	var parts: Array[String] = []
 	for record in records:
-		var unit_id := int(record.get("unit_id", -1))
 		var from_pos: Vector2i = record.get("from", Vector2i.ZERO)
-		parts.append("U%d %s" % [unit_id, _format_vec2i(from_pos)])
+		if record.has("unit_id"):
+			var unit_id := int(record.get("unit_id", -1))
+			if record.has("coins"):
+				var coins := int(record.get("coins", 0))
+				parts.append("U%d %s $%d" % [unit_id, _format_vec2i(from_pos), coins])
+			else:
+				parts.append("U%d %s" % [unit_id, _format_vec2i(from_pos)])
+		else:
+			var bag_id := int(record.get("bag_id", -1))
+			var coins := int(record.get("coins", 0))
+			parts.append("B%d %s $%d" % [bag_id, _format_vec2i(from_pos), coins])
 	return "[" + ", ".join(parts) + "]"
 
 
@@ -1085,6 +1114,35 @@ func _set_test_scenario(scenario_id: int) -> void:
 			test_mover_grid = Vector2i(5, 2)
 			test_mover_alive = false
 			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
+		TEST_SCENARIO_PORTAL_BAG:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(5, 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(5, 2)
+			test_mover_alive = false
+			_add_test_portal_pair(1, Vector2i(1, GRID_COUNT - 1), Vector2i(5, 2), 0)
+		TEST_SCENARIO_EXIT_BAG:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(5, 1)
+			test_enemy_alive = false
+			test_mover_grid = Vector2i(5, 2)
+			test_mover_alive = false
+			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
+		TEST_SCENARIO_EXIT_UNIT_BAG:
+			player_grid = Vector2i(0, GRID_COUNT - 1)
+			player_coins = 5
+			player_entry_coins = 5
+			test_enemy_grid = Vector2i(1, GRID_COUNT - 1)
+			test_enemy_alive = true
+			test_enemy_coins = 0
+			test_enemy_entry_coins = 0
+			test_mover_grid = Vector2i(5, 2)
+			test_mover_alive = false
+			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
 
 	_set_current_intent_stay()
 	if game_state != null:
@@ -1185,6 +1243,23 @@ func _draw_bag(bag: BagState) -> void:
 		18,
 		Color(0.95, 0.9, 0.7)
 	)
+
+	var marker := ""
+	if bag.queued_exit:
+		marker = "QE"
+	elif bag.has_queued_teleport:
+		marker = "QT"
+
+	if marker != "":
+		draw_string(
+			timer_font,
+			center + Vector2(-CELL_SIZE * 0.12, -CELL_SIZE * 0.10),
+			marker,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			12,
+			Color(1.0, 0.95, 0.5)
+		)
 
 
 func _draw_portal_tile(tile: TileState) -> void:
