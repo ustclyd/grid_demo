@@ -136,7 +136,8 @@ func _resolve_queued_exits(state_after: GameState, result: TurnResult) -> void:
 		if units_at_pos.size() > 0:
 			collector = _pick_exit_coin_collector(units_at_pos)
 
-		for bag in bags_at_pos:
+		for bag_value in bags_at_pos:
+			var bag: BagState = bag_value
 			bag.queued_exit = false
 			if collector != null:
 				collector.coins += bag.coins
@@ -147,7 +148,8 @@ func _resolve_queued_exits(state_after: GameState, result: TurnResult) -> void:
 			})
 			bags_to_remove.append(bag)
 
-		for unit in units_at_pos:
+		for unit_value in units_at_pos:
+			var unit: UnitState = unit_value
 			var exit_from := unit.pos
 			unit.queued_exit = false
 
