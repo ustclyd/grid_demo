@@ -40,6 +40,19 @@ const TEST_SCENARIO_EXIT_QUEUED := 21
 const TEST_SCENARIO_PORTAL_BAG := 22
 const TEST_SCENARIO_EXIT_BAG := 23
 const TEST_SCENARIO_EXIT_UNIT_BAG := 24
+const TEST_SCENARIO_PUSH_BASIC := 25
+const TEST_SCENARIO_PUSH_EDGE := 26
+const TEST_SCENARIO_PUSH_CONFLICT := 27
+const TEST_SCENARIO_PUSH_SAME := 28
+const TEST_SCENARIO_PUSH_MIXED := 29
+
+const STAY_PUSH_SCENARIOS := [
+	TEST_SCENARIO_PUSH_BASIC,
+	TEST_SCENARIO_PUSH_EDGE,
+	TEST_SCENARIO_PUSH_CONFLICT,
+	TEST_SCENARIO_PUSH_SAME,
+	TEST_SCENARIO_PUSH_MIXED,
+]
 
 var player_grid := Vector2i(0, GRID_COUNT - 1)
 var player_alive := true
@@ -66,6 +79,7 @@ var current_test_scenario := TEST_SCENARIO_STAYER
 var game_state: GameState
 # The original fixtures use the legacy knockback behavior.
 var turn_resolver := TurnResolver.new(MapTurnRules.new(), false)
+var puzzle_turn_resolver := TurnResolver.new()
 var turn_presentation := TurnPresentation.new()
 var current_player_intent: ActionIntent
 var last_turn_result: TurnResult
@@ -176,6 +190,16 @@ func _input(event: InputEvent) -> void:
 				_set_test_scenario(TEST_SCENARIO_EXIT_BAG)
 			KEY_R:
 				_set_test_scenario(TEST_SCENARIO_EXIT_UNIT_BAG)
+			KEY_B:
+				_set_test_scenario(TEST_SCENARIO_PUSH_BASIC)
+			KEY_N:
+				_set_test_scenario(TEST_SCENARIO_PUSH_EDGE)
+			KEY_M:
+				_set_test_scenario(TEST_SCENARIO_PUSH_CONFLICT)
+			KEY_F:
+				_set_test_scenario(TEST_SCENARIO_PUSH_SAME)
+			KEY_V:
+				_set_test_scenario(TEST_SCENARIO_PUSH_MIXED)
 
 
 func _draw() -> void:
@@ -235,7 +259,10 @@ func _on_timer_timeout() -> void:
 	intents.append(_build_test_enemy_intent())
 	if test_mover_alive:
 		intents.append(_build_test_mover_intent())
-	last_turn_result = turn_resolver.resolve_turn(game_state, intents)
+	var resolver := turn_resolver
+	if current_test_scenario in STAY_PUSH_SCENARIOS:
+		resolver = puzzle_turn_resolver
+	last_turn_result = resolver.resolve_turn(game_state, intents)
 	last_playback_events = turn_presentation.build_events(last_turn_result)
 	_apply_turn_result_to_legacy()
 
@@ -348,6 +375,7 @@ func _draw_debug_panel() -> void:
 		"Execute" if is_executing else "Input"
 	])
 	lines.append("Keys: 1-0 Pick/Move, T/Y/U/I/O/P/G Throw, H/J/W Portal, K/L/Q/E/R Exit")
+	lines.append("Stay push: B basic, N edge, M conflict, F same direction, V different directions")
 	lines.append("")
 	lines.append("Units")
 	lines.append(_format_unit_status_line(1, "P1"))
@@ -674,6 +702,10 @@ func _build_test_mover_intent() -> ActionIntent:
 		TEST_SCENARIO_THROW_MULTI_HIT:
 			intent.type = ActionType.MOVE
 			intent.target_pos = Vector2i(2, GRID_COUNT - 1)
+		TEST_SCENARIO_PUSH_SAME, TEST_SCENARIO_PUSH_MIXED:
+			intent.type = ActionType.THROW
+			intent.target_pos = test_enemy_grid
+			intent.throw_amount = _get_throw_amount(test_mover_coins)
 
 	return intent
 
@@ -730,6 +762,16 @@ func _get_test_scenario_name() -> String:
 			return "ExitBag"
 		TEST_SCENARIO_EXIT_UNIT_BAG:
 			return "ExitUnitBag"
+		TEST_SCENARIO_PUSH_BASIC:
+			return "StayPushBasic"
+		TEST_SCENARIO_PUSH_EDGE:
+			return "StayPushEdge"
+		TEST_SCENARIO_PUSH_CONFLICT:
+			return "StayPushConflict"
+		TEST_SCENARIO_PUSH_SAME:
+			return "StayPushSameDirection"
+		TEST_SCENARIO_PUSH_MIXED:
+			return "StayPushDifferentDirections"
 	return "Unknown"
 
 
@@ -1146,6 +1188,9 @@ func _set_test_scenario(scenario_id: int) -> void:
 			test_mover_alive = false
 			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
 
+	if scenario_id in STAY_PUSH_SCENARIOS:
+		_setup_stay_push_scenario(scenario_id)
+
 	_set_current_intent_stay()
 	if game_state != null:
 		_sync_game_state_from_legacy()
@@ -1154,6 +1199,26 @@ func _set_test_scenario(scenario_id: int) -> void:
 			if queued_enemy != null:
 				queued_enemy.queued_exit = true
 	queue_redraw()
+
+
+func _setup_stay_push_scenario(scenario_id: int) -> void:
+	var bottom := GRID_COUNT - 1
+	player_grid = Vector2i(0, bottom)
+	player_coins = 5
+	player_entry_coins = 5
+	test_enemy_grid = Vector2i(1, bottom)
+
+	match scenario_id:
+		TEST_SCENARIO_PUSH_EDGE:
+			player_grid = Vector2i(GRID_COUNT - 2, bottom)
+			test_enemy_grid = Vector2i(GRID_COUNT - 1, bottom)
+		TEST_SCENARIO_PUSH_CONFLICT, TEST_SCENARIO_PUSH_MIXED:
+			test_mover_grid = Vector2i(2, bottom)
+			test_mover_alive = true
+		TEST_SCENARIO_PUSH_SAME:
+			test_enemy_grid = Vector2i(2, bottom)
+			test_mover_grid = Vector2i(1, bottom)
+			test_mover_alive = true
 
 
 func _add_test_bag(bag_id: int, grid: Vector2i, coins: int) -> void:
