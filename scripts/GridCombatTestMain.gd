@@ -64,7 +64,7 @@ var timer_font: Font
 var current_test_scenario := TEST_SCENARIO_STAYER
 
 var game_state: GameState
-var turn_resolver := TurnResolver.new()
+var turn_resolver := TurnResolver.new(MapTurnRules.new())
 var turn_presentation := TurnPresentation.new()
 var current_player_intent: ActionIntent
 var last_turn_result: TurnResult
@@ -487,17 +487,18 @@ func _sync_game_state_from_legacy() -> void:
 	game_state.bags.clear()
 	for test_bag in test_bags:
 		game_state.bags.append(test_bag.duplicate_state())
-	game_state.tiles.clear()
+	var map_state := game_state.map_state
+	map_state.tiles.clear()
 	for test_tile in test_tiles:
-		game_state.tiles.append(test_tile.duplicate_state())
-	game_state.exit_portal_tile = Vector2i.ZERO
+		map_state.tiles.append(test_tile.duplicate_state())
+	map_state.exit_portal_tile = Vector2i.ZERO
 	for test_tile in test_tiles:
 		if test_tile.tile_type == TileType.EXIT_PORTAL:
-			game_state.exit_portal_tile = test_tile.pos
+			map_state.exit_portal_tile = test_tile.pos
 			break
-	game_state.portal_pairs.clear()
+	map_state.portal_pairs.clear()
 	for pair in test_portal_pairs:
-		game_state.portal_pairs.append(pair.duplicate_state())
+		map_state.portal_pairs.append(pair.duplicate_state())
 
 
 func _apply_turn_result_to_legacy() -> void:
@@ -531,10 +532,10 @@ func _apply_turn_result_to_legacy() -> void:
 	for bag in last_turn_result.state_after.bags:
 		test_bags.append(bag.duplicate_state())
 	test_tiles.clear()
-	for tile in last_turn_result.state_after.tiles:
+	for tile in last_turn_result.state_after.map_state.tiles:
 		test_tiles.append(tile.duplicate_state())
 	test_portal_pairs.clear()
-	for pair in last_turn_result.state_after.portal_pairs:
+	for pair in last_turn_result.state_after.map_state.portal_pairs:
 		test_portal_pairs.append(pair.duplicate_state())
 
 	game_state = last_turn_result.state_after
