@@ -34,12 +34,7 @@ const TEST_SCENARIO_THROW_CONFLICT2 := 15
 const TEST_SCENARIO_THROW_MULTI_HIT := 16
 const TEST_SCENARIO_PORTAL_BASIC := 17
 const TEST_SCENARIO_PORTAL_CONFLICT := 18
-const TEST_SCENARIO_EXIT_BASIC := 19
-const TEST_SCENARIO_EXIT_CONFLICT := 20
-const TEST_SCENARIO_EXIT_QUEUED := 21
 const TEST_SCENARIO_PORTAL_BAG := 22
-const TEST_SCENARIO_EXIT_BAG := 23
-const TEST_SCENARIO_EXIT_UNIT_BAG := 24
 const TEST_SCENARIO_PUSH_BASIC := 25
 const TEST_SCENARIO_PUSH_EDGE := 26
 const TEST_SCENARIO_PUSH_CONFLICT := 27
@@ -178,18 +173,8 @@ func _input(event: InputEvent) -> void:
 				_set_test_scenario(TEST_SCENARIO_PORTAL_BASIC)
 			KEY_J:
 				_set_test_scenario(TEST_SCENARIO_PORTAL_CONFLICT)
-			KEY_K:
-				_set_test_scenario(TEST_SCENARIO_EXIT_BASIC)
-			KEY_L:
-				_set_test_scenario(TEST_SCENARIO_EXIT_CONFLICT)
-			KEY_Q:
-				_set_test_scenario(TEST_SCENARIO_EXIT_QUEUED)
 			KEY_W:
 				_set_test_scenario(TEST_SCENARIO_PORTAL_BAG)
-			KEY_E:
-				_set_test_scenario(TEST_SCENARIO_EXIT_BAG)
-			KEY_R:
-				_set_test_scenario(TEST_SCENARIO_EXIT_UNIT_BAG)
 			KEY_B:
 				_set_test_scenario(TEST_SCENARIO_PUSH_BASIC)
 			KEY_N:
@@ -219,8 +204,6 @@ func _draw() -> void:
 	for tile in test_tiles:
 		if tile.tile_type == TileType.PORTAL:
 			_draw_portal_tile(tile)
-		elif tile.tile_type == TileType.EXIT_PORTAL:
-			_draw_exit_portal_tile(tile)
 
 	if player_alive:
 		var player_center := _grid_to_screen_center(player_grid)
@@ -374,7 +357,7 @@ func _draw_debug_panel() -> void:
 		game_state.turn_index if game_state != null else 0,
 		"Execute" if is_executing else "Input"
 	])
-	lines.append("Keys: 1-0 Pick/Move, T/Y/U/I/O/P/G Throw, H/J/W Portal, K/L/Q/E/R Exit")
+	lines.append("Keys: 1-0 Pick/Move, T/Y/U/I/O/P/G Throw, H/J/W Portal")
 	lines.append("Stay push: B basic, N edge, M conflict, F same direction, V different directions")
 	lines.append("")
 	lines.append("Units")
@@ -401,9 +384,6 @@ func _draw_debug_panel() -> void:
 		lines.append("Knockback: %s" % _format_knockback_records(last_turn_result.knocked_back_records))
 		lines.append("PortalReady: %s" % _format_portal_records(last_turn_result.portal_ready_records))
 		lines.append("Teleported: %s" % _format_portal_records(last_turn_result.teleport_records))
-		lines.append("ExitReady: %s" % _format_exit_records(last_turn_result.exit_ready_records))
-		lines.append("Exited: %s" % _format_exit_records(last_turn_result.exit_records))
-		lines.append("ExitRefresh: %s" % _format_exit_refresh_records(last_turn_result.exit_refresh_records))
 		lines.append("OverheatedPairs: %s" % _format_int_array(last_turn_result.overheated_portal_pair_ids))
 		lines.append("Conflict2: survivors=%s defeated=%s" % [
 			_format_int_array(last_turn_result.conflict2_survivor_unit_ids),
@@ -520,11 +500,6 @@ func _sync_game_state_from_legacy() -> void:
 	map_state.tiles.clear()
 	for test_tile in test_tiles:
 		map_state.tiles.append(test_tile.duplicate_state())
-	map_state.exit_portal_tile = Vector2i.ZERO
-	for test_tile in test_tiles:
-		if test_tile.tile_type == TileType.EXIT_PORTAL:
-			map_state.exit_portal_tile = test_tile.pos
-			break
 	map_state.portal_pairs.clear()
 	for pair in test_portal_pairs:
 		map_state.portal_pairs.append(pair.duplicate_state())
@@ -750,18 +725,8 @@ func _get_test_scenario_name() -> String:
 			return "PortalBasic"
 		TEST_SCENARIO_PORTAL_CONFLICT:
 			return "PortalConflict"
-		TEST_SCENARIO_EXIT_BASIC:
-			return "ExitBasic"
-		TEST_SCENARIO_EXIT_CONFLICT:
-			return "ExitConflict"
-		TEST_SCENARIO_EXIT_QUEUED:
-			return "ExitQueued"
 		TEST_SCENARIO_PORTAL_BAG:
 			return "PortalBag"
-		TEST_SCENARIO_EXIT_BAG:
-			return "ExitBag"
-		TEST_SCENARIO_EXIT_UNIT_BAG:
-			return "ExitUnitBag"
 		TEST_SCENARIO_PUSH_BASIC:
 			return "StayPushBasic"
 		TEST_SCENARIO_PUSH_EDGE:
@@ -850,39 +815,6 @@ func _format_portal_records(records: Array[Dictionary]) -> String:
 	return "[" + ", ".join(parts) + "]"
 
 
-func _format_exit_records(records: Array[Dictionary]) -> String:
-	if records.is_empty():
-		return "[]"
-
-	var parts: Array[String] = []
-	for record in records:
-		var from_pos: Vector2i = record.get("from", Vector2i.ZERO)
-		if record.has("unit_id"):
-			var unit_id := int(record.get("unit_id", -1))
-			if record.has("coins"):
-				var coins := int(record.get("coins", 0))
-				parts.append("U%d %s $%d" % [unit_id, _format_vec2i(from_pos), coins])
-			else:
-				parts.append("U%d %s" % [unit_id, _format_vec2i(from_pos)])
-		else:
-			var bag_id := int(record.get("bag_id", -1))
-			var coins := int(record.get("coins", 0))
-			parts.append("B%d %s $%d" % [bag_id, _format_vec2i(from_pos), coins])
-	return "[" + ", ".join(parts) + "]"
-
-
-func _format_exit_refresh_records(records: Array[Dictionary]) -> String:
-	if records.is_empty():
-		return "[]"
-
-	var parts: Array[String] = []
-	for record in records:
-		var from_pos: Vector2i = record.get("from", Vector2i.ZERO)
-		var to_pos: Vector2i = record.get("to", Vector2i.ZERO)
-		parts.append("%s->%s" % [_format_vec2i(from_pos), _format_vec2i(to_pos)])
-	return "[" + ", ".join(parts) + "]"
-
-
 func _format_unit_status_line(unit_id: int, label: String) -> String:
 	var unit := _get_runtime_unit(unit_id)
 	if unit == null:
@@ -893,7 +825,7 @@ func _format_unit_status_line(unit_id: int, label: String) -> String:
 	var queued_text := "-"
 	if unit.has_queued_teleport:
 		queued_text = _format_vec2i(unit.queued_teleport_to)
-	return "%s pos=%s coins=%d entry=%d alive=%s won=%s fs=%d qtp=%s qex=%s tp=%s intent=%s" % [
+	return "%s pos=%s coins=%d entry=%d alive=%s won=%s fs=%d qtp=%s tp=%s intent=%s" % [
 		label,
 		_format_vec2i(unit.pos),
 		unit.coins,
@@ -902,7 +834,6 @@ func _format_unit_status_line(unit_id: int, label: String) -> String:
 		"Y" if unit.won else "N",
 		unit.forced_stay_turns,
 		queued_text,
-		"Y" if unit.queued_exit else "N",
 		"Y" if unit.teleported_this_turn else "N",
 		intent_text
 	]
@@ -1133,31 +1064,6 @@ func _set_test_scenario(scenario_id: int) -> void:
 			test_mover_grid = Vector2i(5, 1)
 			test_mover_alive = false
 			_add_test_portal_pair(1, Vector2i(1, GRID_COUNT - 1), Vector2i(5, 2), 0)
-		TEST_SCENARIO_EXIT_BASIC:
-			player_grid = Vector2i(0, GRID_COUNT - 1)
-			test_enemy_grid = Vector2i(5, 1)
-			test_enemy_alive = false
-			test_mover_grid = Vector2i(5, 2)
-			test_mover_alive = false
-			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
-		TEST_SCENARIO_EXIT_CONFLICT:
-			player_grid = Vector2i(0, GRID_COUNT - 1)
-			test_enemy_grid = Vector2i(1, GRID_COUNT - 1)
-			test_enemy_alive = true
-			test_enemy_coins = 0
-			test_enemy_entry_coins = 0
-			test_mover_grid = Vector2i(5, 2)
-			test_mover_alive = false
-			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
-		TEST_SCENARIO_EXIT_QUEUED:
-			player_grid = Vector2i(0, GRID_COUNT - 1)
-			test_enemy_grid = Vector2i(1, GRID_COUNT - 1)
-			test_enemy_alive = true
-			test_enemy_coins = 0
-			test_enemy_entry_coins = 0
-			test_mover_grid = Vector2i(5, 2)
-			test_mover_alive = false
-			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
 		TEST_SCENARIO_PORTAL_BAG:
 			player_grid = Vector2i(0, GRID_COUNT - 1)
 			player_coins = 5
@@ -1167,37 +1073,12 @@ func _set_test_scenario(scenario_id: int) -> void:
 			test_mover_grid = Vector2i(5, 2)
 			test_mover_alive = false
 			_add_test_portal_pair(1, Vector2i(1, GRID_COUNT - 1), Vector2i(5, 2), 0)
-		TEST_SCENARIO_EXIT_BAG:
-			player_grid = Vector2i(0, GRID_COUNT - 1)
-			player_coins = 5
-			player_entry_coins = 5
-			test_enemy_grid = Vector2i(5, 1)
-			test_enemy_alive = false
-			test_mover_grid = Vector2i(5, 2)
-			test_mover_alive = false
-			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
-		TEST_SCENARIO_EXIT_UNIT_BAG:
-			player_grid = Vector2i(0, GRID_COUNT - 1)
-			player_coins = 5
-			player_entry_coins = 5
-			test_enemy_grid = Vector2i(1, GRID_COUNT - 1)
-			test_enemy_alive = true
-			test_enemy_coins = 0
-			test_enemy_entry_coins = 0
-			test_mover_grid = Vector2i(5, 2)
-			test_mover_alive = false
-			_add_test_exit_portal(Vector2i(1, GRID_COUNT - 1))
 
 	if scenario_id in STAY_PUSH_SCENARIOS:
 		_setup_stay_push_scenario(scenario_id)
 
 	_set_current_intent_stay()
-	if game_state != null:
-		_sync_game_state_from_legacy()
-		if scenario_id == TEST_SCENARIO_EXIT_QUEUED:
-			var queued_enemy := game_state.get_unit_by_id(2)
-			if queued_enemy != null:
-				queued_enemy.queued_exit = true
+	_sync_game_state_from_legacy()
 	queue_redraw()
 
 
@@ -1251,13 +1132,6 @@ func _add_test_portal_pair(pair_id: int, entry_a: Vector2i, entry_b: Vector2i, c
 	tile_b.portal_pair_id = pair_id
 	tile_b.portal_color_id = color_id
 	test_tiles.append(tile_b)
-
-
-func _add_test_exit_portal(pos: Vector2i) -> void:
-	var tile := TileState.new()
-	tile.pos = pos
-	tile.tile_type = TileType.EXIT_PORTAL
-	test_tiles.append(tile)
 
 
 func _get_throw_amount(coins: int) -> int:
@@ -1349,15 +1223,6 @@ func _draw_portal_tile(tile: TileState) -> void:
 			14,
 			color
 		)
-
-
-func _draw_exit_portal_tile(tile: TileState) -> void:
-	var center := _grid_to_screen_center(tile.pos)
-	var color := Color(0.95, 0.9, 0.25)
-	draw_arc(center, CELL_SIZE * 0.24, 0.0, TAU, 48, color, 3.0)
-	draw_arc(center, CELL_SIZE * 0.14, 0.0, TAU, 48, color, 2.0)
-	draw_line(center + Vector2(-CELL_SIZE * 0.08, 0), center + Vector2(CELL_SIZE * 0.08, 0), color, 2.0)
-	draw_line(center + Vector2(0, -CELL_SIZE * 0.08), center + Vector2(0, CELL_SIZE * 0.08), color, 2.0)
 
 
 func _get_bag_draw_center(bag: BagState) -> Vector2:
