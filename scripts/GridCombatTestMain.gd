@@ -64,7 +64,8 @@ var timer_font: Font
 var current_test_scenario := TEST_SCENARIO_STAYER
 
 var game_state: GameState
-var turn_resolver := TurnResolver.new(MapTurnRules.new())
+# The original fixtures use the legacy knockback behavior.
+var turn_resolver := TurnResolver.new(MapTurnRules.new(), false)
 var turn_presentation := TurnPresentation.new()
 var current_player_intent: ActionIntent
 var last_turn_result: TurnResult

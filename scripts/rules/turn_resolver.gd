@@ -7,10 +7,12 @@ const CONFLICT1_ROLE_NORMAL := "normal"
 
 
 var _map_rules: MapTurnRules
+var _push_active_stayers: bool
 
 
-func _init(map_rules: MapTurnRules = null) -> void:
+func _init(map_rules: MapTurnRules = null, push_active_stayers: bool = true) -> void:
 	_map_rules = map_rules
+	_push_active_stayers = push_active_stayers
 
 
 func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
@@ -84,7 +86,7 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 		conflict_groups[pos_key].append(unit)
 
 	_resolve_conflict_phase_one(conflict_groups, intent_by_actor_id, result)
-	var conflict2_groups := _resolve_throw_knockback_phase(result.state_after, result)
+	var conflict2_groups := _resolve_throw_knockback_phase(result.state_after, result, intent_by_actor_id)
 	_resolve_conflict_phase_two(conflict2_groups, result)
 	_resolve_death_drop_phase(result.state_after, result)
 	_apply_forced_stay_after_knockback(result.state_after, result)
@@ -159,41 +161,76 @@ func _resolve_throw_phase(state_after: GameState, intent_by_actor_id: Dictionary
 		})
 
 
-func _resolve_throw_knockback_phase(state_after: GameState, result: TurnResult) -> Dictionary:
-	var knocked_back_targets := {}
-	var targeted_pos_keys := {}
-
+func _resolve_throw_knockback_phase(
+	state_after: GameState,
+	result: TurnResult,
+	intent_by_actor_id: Dictionary,
+) -> Dictionary:
+	var directions_by_target: Dictionary[Vector2i, Vector2i] = {}
 	for throw_record in result.thrown_bag_records:
-		var target_pos: Vector2i = throw_record["to"]
-		targeted_pos_keys[_pos_key(target_pos)] = target_pos
+		var target: Vector2i = throw_record["to"]
+		var delta: Vector2i = target - throw_record["from"]
+		var direction := Vector2i(signi(delta.x), signi(delta.y))
+		if directions_by_target.get(target, direction) != direction:
+			directions_by_target[target] = Vector2i.ZERO
+		else:
+			directions_by_target[target] = direction
 
-	for target_pos in targeted_pos_keys.values():
-		var survivor := _get_alive_unit_at_pos(state_after, target_pos)
+	# Read the same post-conflict board for every hit before moving any units.
+	var destinations: Dictionary[int, Vector2i] = {}
+	for target in directions_by_target:
+		var survivor := _get_alive_unit_at_pos(state_after, target)
 		if survivor == null:
 			continue
 
+		var destination := _get_knockback_destination(
+			survivor, directions_by_target[target], state_after.board_size, intent_by_actor_id,
+		)
+		destinations[survivor.id] = destination
 		result.knocked_back_unit_ids.append(survivor.id)
 		result.knocked_back_records.append({
 			"unit_id": survivor.id,
 			"from": survivor.pos,
-			"to": survivor.prev_pos,
+			"to": destination,
 		})
-		survivor.pos = survivor.prev_pos
-		knocked_back_targets[survivor.id] = survivor.pos
+
+	var occupants_by_destination := {}
+	var affected_cells := {}
+	for destination in destinations.values():
+		affected_cells[destination] = true
+	for unit in state_after.units:
+		if not unit.alive or unit.won:
+			continue
+		unit.pos = destinations.get(unit.id, unit.pos)
+		if not affected_cells.has(unit.pos):
+			continue
+		if not occupants_by_destination.has(unit.pos):
+			occupants_by_destination[unit.pos] = []
+		occupants_by_destination[unit.pos].append(unit)
 
 	var conflict2_groups := {}
-	for destination in knocked_back_targets.values():
-		var destination_key := _pos_key(destination)
-		var occupants: Array[UnitState] = []
-		for unit in state_after.units:
-			if not unit.alive or unit.won:
-				continue
-			if unit.pos == destination:
-				occupants.append(unit)
+	for destination in affected_cells:
+		var occupants: Array = occupants_by_destination[destination]
 		if occupants.size() > 1:
-			conflict2_groups[destination_key] = occupants
+			conflict2_groups[destination] = occupants
 
 	return conflict2_groups
+
+
+func _get_knockback_destination(
+	unit: UnitState,
+	direction: Vector2i,
+	board_size: Vector2i,
+	intent_by_actor_id: Dictionary,
+) -> Vector2i:
+	var intent: ActionIntent = intent_by_actor_id.get(unit.id)
+	if not _push_active_stayers or intent == null or intent.type != ActionType.STAY:
+		return unit.prev_pos
+	if _get_unit_conflict1_role(unit, intent_by_actor_id) != CONFLICT1_ROLE_STAY_PRIORITY:
+		return unit.prev_pos
+
+	var pushed_pos := unit.pos + direction
+	return pushed_pos if _is_inside_board(pushed_pos, board_size) else unit.pos
 
 
 func _resolve_conflict_phase_one(conflict_groups: Dictionary, intent_by_actor_id: Dictionary, result: TurnResult) -> void:

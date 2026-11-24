@@ -83,7 +83,8 @@ func _test_exit_bag_flow() -> bool:
 
 
 func _test_exit_unit_bag_flow() -> bool:
-	var resolver := TurnResolver.new(MapTurnRules.new())
+	# Keep the original fixture, with the waiting unit and bag leaving together.
+	var resolver := TurnResolver.new(MapTurnRules.new(), false)
 	var state := _create_base_state()
 	_add_exit_portal(state, Vector2i(1, 6))
 	_add_unit(state, 1, Vector2i(0, 6), 5, 5)
