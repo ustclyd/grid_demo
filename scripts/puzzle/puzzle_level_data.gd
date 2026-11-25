@@ -31,6 +31,8 @@ func validation_error() -> String:
 			return "第 %d 个敌人的位置或持币无效。" % (index + 1)
 		if enemy.policy == null or not enemy.policy.is_available():
 			return "第 %d 个敌人的策略还未实现。" % (index + 1)
+		if not enemy.policy.accepts_spawn(enemy.cell, board_size):
+			return "第 %d 个敌人的出生格与行动路线不匹配。" % (index + 1)
 		occupied[enemy.cell] = true
 		available_coins += enemy.coins
 	for index in bags.size():

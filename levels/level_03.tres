@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="2_enemy"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_bag_spawn.gd" id="3_bag"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_bouncer_policy.gd" id="4_bouncer"]
+
+[sub_resource type="Resource" id="Resource_bouncer"]
+script = ExtResource("4_bouncer")
+kind = 2
+endpoint_a = Vector2i(1, 2)
+endpoint_b = Vector2i(1, 1)
+
+[sub_resource type="Resource" id="Resource_bouncer_spawn"]
+script = ExtResource("2_enemy")
+cell = Vector2i(1, 2)
+coins = 1
+policy = SubResource("Resource_bouncer")
+
+[sub_resource type="Resource" id="Resource_left_bag"]
+script = ExtResource("3_bag")
+cell = Vector2i(0, 0)
+coins = 1
+
+[sub_resource type="Resource" id="Resource_right_bag"]
+script = ExtResource("3_bag")
+cell = Vector2i(2, 0)
+coins = 1
+
+[resource]
+script = ExtResource("1_level")
+title = "03 · 折返线"
+play_hint = "折返兵在 B2 和 B3 之间往返 · 先判断它这回合要进哪一格
+首次同格冲突中，主动待机优先 · 同等优先级下，金币少者胜"
+board_size = Vector2i(3, 3)
+player_cell = Vector2i(1, 0)
+player_coins = 4
+enemies = Array[ExtResource("2_enemy")]([SubResource("Resource_bouncer_spawn")])
+bags = Array[ExtResource("3_bag")]([SubResource("Resource_left_bag"), SubResource("Resource_right_bag")])
+optimal_turns = 4

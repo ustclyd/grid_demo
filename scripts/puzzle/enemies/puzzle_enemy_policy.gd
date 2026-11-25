@@ -32,6 +32,10 @@ func is_available() -> bool:
 	return false
 
 
+func accepts_spawn(_cell: Vector2i, _board_size: Vector2i) -> bool:
+	return true
+
+
 # Implementations choose from the supplied pre-turn snapshot without storing turn state.
 func choose_intent(_board: GameState, _unit_id: int, _player_id: int) -> ActionIntent:
 	return null
