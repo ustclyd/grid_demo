@@ -22,7 +22,7 @@ var thrown_bag_records: Array[Dictionary] = []
 var dropped_bag_records: Array[Dictionary] = []
 var dropped_bag_ids: Array[int] = []
 
-var forced_stay_unit_ids: Array[int] = []
+var stun_next_turn_unit_ids: Array[int] = []
 var portal_ready_unit_ids: Array[int] = []
 var portal_ready_records: Array[Dictionary] = []
 var exit_ready_unit_ids: Array[int] = []

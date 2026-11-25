@@ -105,6 +105,9 @@ func _input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseButton:
+		var player := _get_runtime_unit(1)
+		if player != null and player.stun_turns > 0:
+			return
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			var clicked_grid := _screen_to_grid(event.position)
 			var clicked_bag_id := _get_clicked_bag_id(event.position)
@@ -389,7 +392,7 @@ func _draw_debug_panel() -> void:
 			_format_int_array(last_turn_result.conflict2_survivor_unit_ids),
 			_format_int_array(last_turn_result.conflict2_defeated_unit_ids)
 		])
-		lines.append("ForcedStay next turn: %s" % _format_int_array(last_turn_result.forced_stay_unit_ids))
+		lines.append("Stun next turn: %s" % _format_int_array(last_turn_result.stun_next_turn_unit_ids))
 		lines.append("Dead: %s" % _format_int_array(last_turn_result.dead_unit_ids))
 
 	var start_pos := Vector2(20, 80)
@@ -415,11 +418,11 @@ func _draw_unit_overlay(unit_id: int, center: Vector2, color: Color) -> void:
 	if unit == null:
 		return
 
-	if unit.forced_stay_turns > 0:
+	if unit.stun_turns > 0:
 		draw_string(
 			timer_font,
 			center + Vector2(-CELL_SIZE * 0.16, -CELL_SIZE * 0.22),
-			"FS%d" % unit.forced_stay_turns,
+			"STUN%d" % unit.stun_turns,
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
 			14,
@@ -820,19 +823,18 @@ func _format_unit_status_line(unit_id: int, label: String) -> String:
 	if unit == null:
 		return "%s: <none>" % label
 
-	var intent := _get_runtime_intent(unit_id)
-	var intent_text := _format_intent_summary(intent)
+	var intent_text := "STUN" if unit.stun_turns > 0 else _format_intent_summary(_get_runtime_intent(unit_id))
 	var queued_text := "-"
 	if unit.has_queued_teleport:
 		queued_text = _format_vec2i(unit.queued_teleport_to)
-	return "%s pos=%s coins=%d entry=%d alive=%s won=%s fs=%d qtp=%s tp=%s intent=%s" % [
+	return "%s pos=%s coins=%d entry=%d alive=%s won=%s stun=%d qtp=%s tp=%s intent=%s" % [
 		label,
 		_format_vec2i(unit.pos),
 		unit.coins,
 		unit.entry_coins,
 		"Y" if unit.alive else "N",
 		"Y" if unit.won else "N",
-		unit.forced_stay_turns,
+		unit.stun_turns,
 		queued_text,
 		"Y" if unit.teleported_this_turn else "N",
 		intent_text

@@ -11,7 +11,7 @@ var entry_coins: int = 0
 var alive: bool = true
 var won: bool = false
 
-var forced_stay_turns: int = 0
+var stun_turns: int = 0
 
 var queued_teleport_to: Vector2i = Vector2i.ZERO
 var has_queued_teleport: bool = false
@@ -35,7 +35,7 @@ func duplicate_state() -> UnitState:
 	copy.entry_coins = entry_coins
 	copy.alive = alive
 	copy.won = won
-	copy.forced_stay_turns = forced_stay_turns
+	copy.stun_turns = stun_turns
 	copy.queued_teleport_to = queued_teleport_to
 	copy.has_queued_teleport = has_queued_teleport
 	copy.queued_exit = queued_exit

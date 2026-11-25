@@ -13,6 +13,10 @@ func _init() -> void:
 		"occupied landing triggers conflict two and a drop": _test_occupied_landing,
 		"simultaneous hits use the same board in either order": _test_simultaneous_hits,
 		"simultaneous landings on one tile are resolved together": _test_shared_landing,
+		"stun changes conflict one on the following turn": _test_stun_priority_in_conflict_one,
+		"stunned occupant loses in conflict two": _test_stun_priority_in_conflict_two,
+		"stun blocks movement, pick, and throw": _test_stun_blocks_actions,
+		"another hit renews stun and a clear turn ends it": _test_stun_renewal_and_recovery,
 	}
 	var failures := 0
 	for label in cases:
@@ -44,7 +48,7 @@ func _test_push_after_conflict_one() -> bool:
 	return (
 		result.conflict1_defeated_unit_ids == [3]
 		and _has_knockback(result, 2, impact, landing)
-		and final_guard.alive and final_guard.pos == landing and final_guard.forced_stay_turns == 1
+		and final_guard.alive and final_guard.pos == landing and final_guard.stun_turns == 1
 		and thrown_bag != null and thrown_bag.pos == impact and thrown_bag.coins == 2
 		and state.get_unit_by_id(2).pos == impact and state.bags.is_empty()
 	)
@@ -71,7 +75,7 @@ func _test_board_edge() -> bool:
 	var guard := result.state_after.get_unit_by_id(2)
 	return (
 		_has_knockback(result, 2, impact, impact)
-		and guard.alive and guard.pos == impact and guard.forced_stay_turns == 1
+		and guard.alive and guard.pos == impact and guard.stun_turns == 1
 		and result.state_after.bags.size() == 1 and result.state_after.bags[0].pos == impact
 	)
 
@@ -93,7 +97,7 @@ func _test_only_active_stay_pushes() -> bool:
 		var intents: Array[ActionIntent] = [_action(1, ActionType.THROW, impact, 2)]
 		match action_type:
 			ActionType.STAY:
-				guard.forced_stay_turns = 1
+				guard.stun_turns = 1
 				intents.append(_action(2, ActionType.STAY))
 			ActionType.PICK:
 				var bag := BagState.new()
@@ -149,7 +153,7 @@ func _test_mixed_directions() -> bool:
 		var guard := result.state_after.get_unit_by_id(4)
 		if result.thrown_bag_records.size() != 3 or result.knocked_back_unit_ids != [4]:
 			return false
-		if not _has_knockback(result, 4, impact, impact) or guard.pos != impact or guard.forced_stay_turns != 1:
+		if not _has_knockback(result, 4, impact, impact) or guard.pos != impact or guard.stun_turns != 1:
 			return false
 	return true
 
@@ -214,8 +218,109 @@ func _test_shared_landing() -> bool:
 	return (
 		_has_knockback(result, 2, left, landing) and _has_knockback(result, 4, right, landing)
 		and result.conflict2_survivor_unit_ids == [2] and result.conflict2_defeated_unit_ids == [4]
-		and result.forced_stay_unit_ids == [2]
+		and result.stun_next_turn_unit_ids == [2]
 	)
+
+
+func _test_stun_priority_in_conflict_one() -> bool:
+	var player_pos := Vector2i(5, 2)
+	var edge := Vector2i(6, 2)
+	var state := _board([_unit(1, player_pos, 5), _unit(2, edge, 1)])
+	var resolver := TurnResolver.new()
+	var move := _action(1, ActionType.MOVE, edge)
+	var stay := _action(2, ActionType.STAY)
+	var before_hit := resolver.resolve_turn(state, [move, stay])
+	if before_hit.conflict1_defeated_unit_ids != [1]:
+		return false
+
+	var hit := resolver.resolve_turn(state, [_action(1, ActionType.THROW, edge, 2), stay])
+	var hit_guard := hit.state_after.get_unit_by_id(2)
+	if not hit_guard.alive or hit_guard.pos != edge or hit_guard.stun_turns != 1:
+		return false
+
+	var follow_up := resolver.resolve_turn(hit.state_after, [move, stay])
+	var winner := follow_up.state_after.get_unit_by_id(1)
+	return (
+		follow_up.conflict1_defeated_unit_ids == [2]
+		and winner.alive and winner.pos == edge and winner.coins == 3
+		and follow_up.stun_next_turn_unit_ids.is_empty()
+	)
+
+
+func _test_stun_priority_in_conflict_two() -> bool:
+	var impact := Vector2i(1, 2)
+	var landing := Vector2i(2, 2)
+	var stunned_occupant := _unit(3, landing, 1)
+	stunned_occupant.stun_turns = 1
+	var state := _board([_unit(1, Vector2i(0, 2), 5), _unit(2, impact, 5), stunned_occupant])
+	var result := TurnResolver.new().resolve_turn(state, [
+		_action(1, ActionType.THROW, impact, 2),
+		_action(2, ActionType.STAY),
+		_action(3, ActionType.STAY),
+	])
+	var winner := result.state_after.get_unit_by_id(2)
+	return (
+		result.conflict1_defeated_unit_ids.is_empty()
+		and result.conflict2_defeated_unit_ids == [3]
+		and winner.alive and winner.pos == landing and winner.stun_turns == 1
+	)
+
+
+func _test_stun_blocks_actions() -> bool:
+	var origin := Vector2i(1, 2)
+	var target := Vector2i(2, 2)
+	var unit := _unit(1, origin, 5)
+	unit.stun_turns = 1
+	var state := _board([unit])
+	var bag := BagState.new()
+	bag.id = 10
+	bag.pos = origin
+	bag.coins = 2
+	state.bags.append(bag)
+
+	var pick := _action(1, ActionType.PICK)
+	pick.target_bag_id = bag.id
+	var attempts: Array[ActionIntent] = [
+		_action(1, ActionType.MOVE, target), pick, _action(1, ActionType.THROW, target, 2),
+	]
+	for intent in attempts:
+		var result := TurnResolver.new().resolve_turn(state, [intent])
+		var after := result.state_after.get_unit_by_id(1)
+		if after.pos != origin or after.coins != 5 or after.stun_turns != 0:
+			return false
+		if not result.moved_unit_ids.is_empty() or not result.picked_bag_records.is_empty():
+			return false
+		if not result.thrown_bag_records.is_empty() or result.state_after.bags.size() != 1:
+			return false
+	return unit.stun_turns == 1 and state.get_bag_by_id(bag.id) != null
+
+
+func _test_stun_renewal_and_recovery() -> bool:
+	var impact := Vector2i(1, 2)
+	var destination := Vector2i(2, 2)
+	var guard := _unit(2, impact, 1)
+	guard.stun_turns = 1
+	var state := _board([_unit(1, Vector2i(0, 2), 5), guard])
+	var resolver := TurnResolver.new()
+
+	var hit := resolver.resolve_turn(state, [
+		_action(1, ActionType.THROW, impact, 2),
+		_action(2, ActionType.STAY),
+	])
+	var hit_guard := hit.state_after.get_unit_by_id(2)
+	if not _has_knockback(hit, 2, impact, impact):
+		return false
+	if hit_guard.pos != impact or hit_guard.stun_turns != 1 or hit.stun_next_turn_unit_ids != [2]:
+		return false
+
+	var move := _action(2, ActionType.MOVE, destination)
+	var clear_turn := resolver.resolve_turn(hit.state_after, [move])
+	var recovering_guard := clear_turn.state_after.get_unit_by_id(2)
+	if recovering_guard.pos != impact or recovering_guard.stun_turns != 0:
+		return false
+
+	var recovered := resolver.resolve_turn(clear_turn.state_after, [move])
+	return recovered.moved_unit_ids == [2] and recovered.state_after.get_unit_by_id(2).pos == destination
 
 
 func _board(units: Array[UnitState]) -> GameState:

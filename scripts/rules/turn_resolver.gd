@@ -2,7 +2,7 @@ class_name TurnResolver
 extends RefCounted
 
 const CONFLICT1_ROLE_STAY_PRIORITY := "stay_priority"
-const CONFLICT1_ROLE_FORCED_STAY := "forced_stay"
+const CONFLICT1_ROLE_STUNNED := "stunned"
 const CONFLICT1_ROLE_NORMAL := "normal"
 
 
@@ -22,12 +22,14 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 	result.state_after = state.duplicate_state()
 	result.state_after.turn_index += 1
 
+	var intent_by_actor_id := _build_intent_lookup(intents)
 	for unit in result.state_after.units:
 		unit.teleported_this_turn = false
+		if unit.stun_turns > 0:
+			intent_by_actor_id.erase(unit.id)
 	if _map_rules != null:
 		_map_rules.apply_turn_start(result)
 
-	var intent_by_actor_id := _build_intent_lookup(intents)
 	_resolve_pick_phase(result.state_after, intent_by_actor_id, result)
 	_resolve_throw_phase(result.state_after, intent_by_actor_id, result)
 	var conflict_groups := {}
@@ -36,47 +38,14 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 		if not unit.alive or unit.won:
 			continue
 
-		var intent: ActionIntent = intent_by_actor_id.get(unit.id)
-		var conflict1_role := ""
+		var conflict1_role := CONFLICT1_ROLE_NORMAL
 		if not unit.teleported_this_turn:
 			unit.prev_pos = unit.pos
-
-		if unit.forced_stay_turns > 0:
-			unit.forced_stay_turns -= 1
-			if not unit.teleported_this_turn:
-				intent = null
-				conflict1_role = CONFLICT1_ROLE_FORCED_STAY
-
-		if unit.teleported_this_turn:
-			conflict1_role = CONFLICT1_ROLE_NORMAL
-			unit.set_meta("conflict1_role", conflict1_role)
-			var teleported_pos_key := _pos_key(unit.pos)
-			if not conflict_groups.has(teleported_pos_key):
-				conflict_groups[teleported_pos_key] = []
-			conflict_groups[teleported_pos_key].append(unit)
-			continue
-
-		if intent == null:
-			if conflict1_role == "":
-				conflict1_role = _get_conflict1_role(unit, intent)
-			unit.set_meta("conflict1_role", conflict1_role)
-			var null_intent_pos_key := _pos_key(unit.pos)
-			if not conflict_groups.has(null_intent_pos_key):
-				conflict_groups[null_intent_pos_key] = []
-			conflict_groups[null_intent_pos_key].append(unit)
-			continue
-
-		match intent.type:
-			ActionType.PICK:
-				pass
-			ActionType.MOVE:
+			var intent: ActionIntent = intent_by_actor_id.get(unit.id)
+			if intent != null and intent.type == ActionType.MOVE:
 				if _is_valid_move_target(unit.pos, intent.target_pos, result.state_after.board_size):
 					unit.pos = intent.target_pos
 					result.moved_unit_ids.append(unit.id)
-			ActionType.STAY:
-				pass
-
-		if conflict1_role == "":
 			conflict1_role = _get_conflict1_role(unit, intent)
 		unit.set_meta("conflict1_role", conflict1_role)
 
@@ -89,7 +58,7 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 	var conflict2_groups := _resolve_throw_knockback_phase(result.state_after, result, intent_by_actor_id)
 	_resolve_conflict_phase_two(conflict2_groups, result)
 	_resolve_death_drop_phase(result.state_after, result)
-	_apply_forced_stay_after_knockback(result.state_after, result)
+	_update_stun_after_turn(result.state_after, result)
 	if _map_rules != null:
 		_map_rules.apply_turn_end(result)
 
@@ -223,6 +192,8 @@ func _get_knockback_destination(
 	board_size: Vector2i,
 	intent_by_actor_id: Dictionary,
 ) -> Vector2i:
+	if unit.stun_turns > 0:
+		return unit.pos
 	var intent: ActionIntent = intent_by_actor_id.get(unit.id)
 	if not _push_active_stayers or intent == null or intent.type != ActionType.STAY:
 		return unit.prev_pos
@@ -274,14 +245,18 @@ func _resolve_conflict_phase_two(conflict_groups: Dictionary, result: TurnResult
 			_mark_unit_defeated(unit, result.conflict2_defeated_unit_ids, result)
 
 
-func _apply_forced_stay_after_knockback(state_after: GameState, result: TurnResult) -> void:
+func _update_stun_after_turn(state_after: GameState, result: TurnResult) -> void:
+	# Spend the current turn's stun only after both conflicts have resolved.
+	for unit in state_after.units:
+		if unit.stun_turns > 0:
+			unit.stun_turns -= 1
+
 	for unit_id in result.knocked_back_unit_ids:
 		var unit := state_after.get_unit_by_id(unit_id)
 		if unit == null or not unit.alive:
 			continue
-		unit.forced_stay_turns = maxi(unit.forced_stay_turns, 1)
-		if not result.forced_stay_unit_ids.has(unit.id):
-			result.forced_stay_unit_ids.append(unit.id)
+		unit.stun_turns = 1
+		result.stun_next_turn_unit_ids.append(unit.id)
 
 
 func _resolve_death_drop_phase(state_after: GameState, result: TurnResult) -> void:
@@ -328,20 +303,14 @@ func _pick_conflict_winner(units_in_cell: Array, intent_by_actor_id: Dictionary)
 	var pure_stayers: Array[UnitState] = []
 	for unit in units_in_cell:
 		var role := _get_unit_conflict1_role(unit, intent_by_actor_id)
-		if role == CONFLICT1_ROLE_STAY_PRIORITY or role == CONFLICT1_ROLE_FORCED_STAY:
+		if role == CONFLICT1_ROLE_STAY_PRIORITY:
 			pure_stayers.append(unit)
 
 	var candidates: Array = units_in_cell
 	if pure_stayers.size() > 0:
 		candidates = pure_stayers
 
-	var winner: UnitState = candidates[0]
-	for index in range(1, candidates.size()):
-		var challenger: UnitState = candidates[index]
-		if _compare_unit_priority(challenger, winner) < 0:
-			winner = challenger
-
-	return winner
+	return _pick_standard_conflict_winner(candidates)
 
 
 func _pick_standard_conflict_winner(units_in_cell: Array) -> UnitState:
@@ -364,6 +333,8 @@ func _mark_unit_defeated(unit: UnitState, defeated_list: Array[int], result: Tur
 
 
 func _get_conflict1_role(unit: UnitState, intent: ActionIntent) -> String:
+	if unit.stun_turns > 0:
+		return CONFLICT1_ROLE_STUNNED
 	if intent == null:
 		return CONFLICT1_ROLE_STAY_PRIORITY
 
@@ -408,6 +379,11 @@ func _get_unit_conflict1_role(unit: UnitState, intent_by_actor_id: Dictionary) -
 
 
 func _compare_unit_priority(a: UnitState, b: UnitState) -> int:
+	var a_stunned := a.stun_turns > 0
+	var b_stunned := b.stun_turns > 0
+	if a_stunned != b_stunned:
+		return 1 if a_stunned else -1
+
 	if a.coins != b.coins:
 		return -1 if a.coins < b.coins else 1
 
