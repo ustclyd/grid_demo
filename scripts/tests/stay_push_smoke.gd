@@ -76,7 +76,8 @@ func _test_board_edge() -> bool:
 	return (
 		_has_knockback(result, 2, impact, impact)
 		and guard.alive and guard.pos == impact and guard.stun_turns == 1
-		and result.state_after.bags.size() == 1 and result.state_after.bags[0].pos == impact
+		and guard.coins == 3 and result.state_after.bags.is_empty()
+		and result.picked_bag_records.size() == 1 and result.picked_bag_records[0]["unit_id"] == 2
 	)
 
 
@@ -91,7 +92,7 @@ func _test_only_active_stay_pushes() -> bool:
 	if not _has_knockback(moved, 2, impact, origin) or moved.state_after.get_unit_by_id(2).pos != origin:
 		return false
 
-	for action_type in [ActionType.STAY, ActionType.PICK, ActionType.THROW, ""]:
+	for action_type in [ActionType.STAY, ActionType.THROW, ""]:
 		var guard := _unit(2, impact, 5)
 		var state := _board([_unit(1, Vector2i(1, 2), 5), guard])
 		var intents: Array[ActionIntent] = [_action(1, ActionType.THROW, impact, 2)]
@@ -99,21 +100,10 @@ func _test_only_active_stay_pushes() -> bool:
 			ActionType.STAY:
 				guard.stun_turns = 1
 				intents.append(_action(2, ActionType.STAY))
-			ActionType.PICK:
-				var bag := BagState.new()
-				bag.id = 10
-				bag.pos = impact
-				bag.coins = 1
-				state.bags.append(bag)
-				var pick := _action(2, ActionType.PICK)
-				pick.target_bag_id = bag.id
-				intents.append(pick)
 			ActionType.THROW:
 				intents.append(_action(2, ActionType.THROW, Vector2i(2, 1), 2))
 		var result := TurnResolver.new().resolve_turn(state, intents)
 		if not _has_knockback(result, 2, impact, impact) or result.state_after.get_unit_by_id(2).pos != impact:
-			return false
-		if action_type == ActionType.PICK and result.picked_bag_records.size() != 1:
 			return false
 		if action_type == ActionType.THROW and result.thrown_bag_records.size() != 2:
 			return false
@@ -242,7 +232,7 @@ func _test_stun_priority_in_conflict_one() -> bool:
 	var winner := follow_up.state_after.get_unit_by_id(1)
 	return (
 		follow_up.conflict1_defeated_unit_ids == [2]
-		and winner.alive and winner.pos == edge and winner.coins == 3
+		and winner.alive and winner.pos == edge and winner.coins == 6
 		and follow_up.stun_next_turn_unit_ids.is_empty()
 	)
 
@@ -278,10 +268,8 @@ func _test_stun_blocks_actions() -> bool:
 	bag.coins = 2
 	state.bags.append(bag)
 
-	var pick := _action(1, ActionType.PICK)
-	pick.target_bag_id = bag.id
 	var attempts: Array[ActionIntent] = [
-		_action(1, ActionType.MOVE, target), pick, _action(1, ActionType.THROW, target, 2),
+		_action(1, ActionType.MOVE, target), _action(1, ActionType.STAY), _action(1, ActionType.THROW, target, 2),
 	]
 	for intent in attempts:
 		var result := TurnResolver.new().resolve_turn(state, [intent])

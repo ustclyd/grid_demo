@@ -30,9 +30,9 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 	if _map_rules != null:
 		_map_rules.apply_turn_start(result)
 
-	_resolve_pick_phase(result.state_after, intent_by_actor_id, result)
 	_resolve_throw_phase(result.state_after, intent_by_actor_id, result)
 	var conflict_groups := {}
+	var pickup_cells_by_unit_id: Dictionary[int, Vector2i] = {}
 
 	for unit in result.state_after.units:
 		if not unit.alive or unit.won:
@@ -47,6 +47,10 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 					unit.pos = intent.target_pos
 					result.moved_unit_ids.append(unit.id)
 			conflict1_role = _get_conflict1_role(unit, intent)
+			if unit.stun_turns == 0 and (
+				intent == null or intent.type == ActionType.MOVE or intent.type == ActionType.STAY
+			):
+				pickup_cells_by_unit_id[unit.id] = unit.pos
 		unit.set_meta("conflict1_role", conflict1_role)
 
 		var pos_key := _pos_key(unit.pos)
@@ -58,6 +62,7 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 	var conflict2_groups := _resolve_throw_knockback_phase(result.state_after, result, intent_by_actor_id)
 	_resolve_conflict_phase_two(conflict2_groups, result)
 	_resolve_death_drop_phase(result.state_after, result)
+	_resolve_auto_pickups(result.state_after, pickup_cells_by_unit_id, result)
 	_update_stun_after_turn(result.state_after, result)
 	if _map_rules != null:
 		_map_rules.apply_turn_end(result)
@@ -70,31 +75,6 @@ func _build_intent_lookup(intents: Array[ActionIntent]) -> Dictionary:
 	for intent in intents:
 		lookup[intent.actor_id] = intent
 	return lookup
-
-
-func _resolve_pick_phase(state_after: GameState, intent_by_actor_id: Dictionary, result: TurnResult) -> void:
-	for unit in state_after.units:
-		if not unit.alive or unit.won:
-			continue
-		if unit.teleported_this_turn:
-			continue
-
-		var intent: ActionIntent = intent_by_actor_id.get(unit.id)
-		if intent == null or intent.type != ActionType.PICK:
-			continue
-
-		if not _is_valid_pick_target(unit, intent, state_after):
-			continue
-
-		var bag := state_after.get_bag_by_id(intent.target_bag_id)
-
-		unit.coins += bag.coins
-		result.picked_bag_records.append({
-			"unit_id": unit.id,
-			"bag_id": bag.id,
-			"coins": bag.coins,
-		})
-		state_after.bags.erase(bag)
 
 
 func _resolve_throw_phase(state_after: GameState, intent_by_actor_id: Dictionary, result: TurnResult) -> void:
@@ -284,6 +264,37 @@ func _resolve_death_drop_phase(state_after: GameState, result: TurnResult) -> vo
 		unit.coins = 0
 
 
+func _resolve_auto_pickups(
+	state_after: GameState,
+	pickup_cells_by_unit_id: Dictionary[int, Vector2i],
+	result: TurnResult,
+) -> void:
+	if state_after.bags.is_empty() or pickup_cells_by_unit_id.is_empty():
+		return
+
+	var collectors_by_cell: Dictionary[Vector2i, UnitState] = {}
+	for unit_id in pickup_cells_by_unit_id:
+		var unit := state_after.get_unit_by_id(unit_id)
+		if unit.alive and unit.pos == pickup_cells_by_unit_id[unit_id]:
+			collectors_by_cell[unit.pos] = unit
+
+	var remaining_bags: Array[BagState] = []
+	for bag in state_after.bags:
+		var collector: UnitState = collectors_by_cell.get(bag.pos)
+		if collector == null:
+			remaining_bags.append(bag)
+			continue
+
+		collector.coins += bag.coins
+		result.picked_bag_records.append({
+			"unit_id": collector.id,
+			"bag_id": bag.id,
+			"coins": bag.coins,
+		})
+
+	state_after.bags = remaining_bags
+
+
 func _get_next_bag_id(state_after: GameState) -> int:
 	var max_bag_id := 0
 	for bag in state_after.bags:
@@ -343,8 +354,6 @@ func _get_conflict1_role(unit: UnitState, intent: ActionIntent) -> String:
 			return CONFLICT1_ROLE_STAY_PRIORITY
 		ActionType.MOVE:
 			return CONFLICT1_ROLE_STAY_PRIORITY if unit.pos == unit.prev_pos else CONFLICT1_ROLE_NORMAL
-		ActionType.PICK:
-			return CONFLICT1_ROLE_NORMAL
 		ActionType.THROW:
 			return CONFLICT1_ROLE_NORMAL
 
@@ -355,11 +364,6 @@ func _is_valid_move_target(from_pos: Vector2i, to_pos: Vector2i, board_size: Vec
 	if not _is_inside_board(to_pos, board_size):
 		return false
 	return to_pos != from_pos and maxi(absi(to_pos.x - from_pos.x), absi(to_pos.y - from_pos.y)) <= 1
-
-
-func _is_valid_pick_target(unit: UnitState, intent: ActionIntent, state_after: GameState) -> bool:
-	var bag := state_after.get_bag_by_id(intent.target_bag_id)
-	return bag != null and bag.pos == unit.pos
 
 
 func _is_valid_throw_action(unit: UnitState, intent: ActionIntent, board_size: Vector2i) -> bool:

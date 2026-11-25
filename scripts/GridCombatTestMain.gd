@@ -20,11 +20,11 @@ const TEST_SCENARIO_MOVER := 1
 const TEST_SCENARIO_THREE_WAY := 2
 const TEST_SCENARIO_SWAP := 3
 const TEST_SCENARIO_TIE := 4
-const TEST_SCENARIO_PICK := 5
-const TEST_SCENARIO_PICK_EMPTY := 6
-const TEST_SCENARIO_PICK_MULTI := 7
-const TEST_SCENARIO_PICK_REMOTE := 8
-const TEST_SCENARIO_PICK_CONFLICT := 9
+const TEST_SCENARIO_AUTO_PICKUP_STAY := 5
+const TEST_SCENARIO_AUTO_PICKUP_EMPTY := 6
+const TEST_SCENARIO_AUTO_PICKUP_MULTI := 7
+const TEST_SCENARIO_AUTO_PICKUP_MOVE := 8
+const TEST_SCENARIO_AUTO_PICKUP_CONFLICT := 9
 const TEST_SCENARIO_THROW := 10
 const TEST_SCENARIO_THROW_LOW_COIN := 11
 const TEST_SCENARIO_THROW_TWO_COINS := 12
@@ -110,17 +110,7 @@ func _input(event: InputEvent) -> void:
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			var clicked_grid := _screen_to_grid(event.position)
-			var clicked_bag_id := _get_clicked_bag_id(event.position)
-			var clicked_any_bag := _is_clicking_any_bag(event.position)
-			if clicked_bag_id != -1:
-				has_pending_target = false
-				pending_target = player_grid
-				_set_current_intent_pick(clicked_bag_id)
-			elif clicked_any_bag:
-				has_pending_target = false
-				pending_target = player_grid
-				_set_current_intent_stay()
-			elif _is_valid_move_target(player_grid, clicked_grid):
+			if _is_valid_move_target(player_grid, clicked_grid):
 				pending_target = clicked_grid
 				has_pending_target = true
 				_set_current_intent_move(clicked_grid)
@@ -149,15 +139,15 @@ func _input(event: InputEvent) -> void:
 			KEY_5:
 				_set_test_scenario(TEST_SCENARIO_TIE)
 			KEY_6:
-				_set_test_scenario(TEST_SCENARIO_PICK)
+				_set_test_scenario(TEST_SCENARIO_AUTO_PICKUP_STAY)
 			KEY_7:
-				_set_test_scenario(TEST_SCENARIO_PICK_EMPTY)
+				_set_test_scenario(TEST_SCENARIO_AUTO_PICKUP_EMPTY)
 			KEY_8:
-				_set_test_scenario(TEST_SCENARIO_PICK_MULTI)
+				_set_test_scenario(TEST_SCENARIO_AUTO_PICKUP_MULTI)
 			KEY_9:
-				_set_test_scenario(TEST_SCENARIO_PICK_REMOTE)
+				_set_test_scenario(TEST_SCENARIO_AUTO_PICKUP_MOVE)
 			KEY_0:
-				_set_test_scenario(TEST_SCENARIO_PICK_CONFLICT)
+				_set_test_scenario(TEST_SCENARIO_AUTO_PICKUP_CONFLICT)
 			KEY_T:
 				_set_test_scenario(TEST_SCENARIO_THROW)
 			KEY_Y:
@@ -360,7 +350,7 @@ func _draw_debug_panel() -> void:
 		game_state.turn_index if game_state != null else 0,
 		"Execute" if is_executing else "Input"
 	])
-	lines.append("Keys: 1-0 Pick/Move, T/Y/U/I/O/P/G Throw, H/J/W Portal")
+	lines.append("Keys: 1-5 Combat, 6-0 Auto pickup, T/Y/U/I/O/P/G Throw, H/J/W Portal")
 	lines.append("Stay push: B basic, N edge, M conflict, F same direction, V different directions")
 	lines.append("")
 	lines.append("Units")
@@ -555,7 +545,6 @@ func _set_current_intent_move(target: Vector2i) -> void:
 
 	current_player_intent.type = ActionType.MOVE
 	current_player_intent.target_pos = target
-	current_player_intent.target_bag_id = -1
 	current_player_intent.throw_amount = 0
 
 
@@ -566,22 +555,6 @@ func _set_current_intent_stay() -> void:
 
 	current_player_intent.type = ActionType.STAY
 	current_player_intent.target_pos = player_grid
-	current_player_intent.target_bag_id = -1
-	current_player_intent.throw_amount = 0
-
-
-func _set_current_intent_pick(bag_id: int) -> void:
-	if current_player_intent == null:
-		current_player_intent = ActionIntent.new()
-		current_player_intent.actor_id = 1
-
-	if not _is_valid_pick_target(bag_id):
-		_set_current_intent_stay()
-		return
-
-	current_player_intent.type = ActionType.PICK
-	current_player_intent.target_pos = player_grid
-	current_player_intent.target_bag_id = bag_id
 	current_player_intent.throw_amount = 0
 
 
@@ -597,7 +570,6 @@ func _set_current_intent_throw(target: Vector2i) -> void:
 
 	current_player_intent.type = ActionType.THROW
 	current_player_intent.target_pos = target
-	current_player_intent.target_bag_id = -1
 	current_player_intent.throw_amount = throw_amount
 
 
@@ -609,10 +581,9 @@ func _build_player_intent_from_legacy() -> ActionIntent:
 	intent.actor_id = current_player_intent.actor_id
 	intent.type = current_player_intent.type
 	intent.target_pos = current_player_intent.target_pos
-	intent.target_bag_id = current_player_intent.target_bag_id
 	intent.throw_amount = current_player_intent.throw_amount
 
-	if current_player_intent.type == ActionType.PICK or current_player_intent.type == ActionType.THROW:
+	if current_player_intent.type == ActionType.THROW:
 		return intent
 
 	if not has_pending_target:
@@ -627,7 +598,6 @@ func _build_test_enemy_intent() -> ActionIntent:
 	intent.actor_id = 2
 	intent.type = ActionType.STAY
 	intent.target_pos = test_enemy_grid
-	intent.target_bag_id = -1
 	intent.throw_amount = 0
 
 	if current_test_scenario == TEST_SCENARIO_THROW_CONFLICT2:
@@ -649,7 +619,6 @@ func _build_test_mover_intent() -> ActionIntent:
 	intent.actor_id = 3
 	intent.type = ActionType.STAY
 	intent.target_pos = test_mover_grid
-	intent.target_bag_id = -1
 	intent.throw_amount = 0
 
 	match current_test_scenario:
@@ -665,7 +634,7 @@ func _build_test_mover_intent() -> ActionIntent:
 		TEST_SCENARIO_TIE:
 			intent.type = ActionType.MOVE
 			intent.target_pos = Vector2i(1, GRID_COUNT - 1)
-		TEST_SCENARIO_PICK_CONFLICT:
+		TEST_SCENARIO_AUTO_PICKUP_CONFLICT:
 			intent.type = ActionType.MOVE
 			intent.target_pos = Vector2i(0, GRID_COUNT - 1)
 		TEST_SCENARIO_THROW_CONFLICT:
@@ -700,16 +669,16 @@ func _get_test_scenario_name() -> String:
 			return "Swap"
 		TEST_SCENARIO_TIE:
 			return "Tie"
-		TEST_SCENARIO_PICK:
-			return "Pick"
-		TEST_SCENARIO_PICK_EMPTY:
-			return "PickEmpty"
-		TEST_SCENARIO_PICK_MULTI:
-			return "PickMulti"
-		TEST_SCENARIO_PICK_REMOTE:
-			return "PickRemote"
-		TEST_SCENARIO_PICK_CONFLICT:
-			return "PickConflict"
+		TEST_SCENARIO_AUTO_PICKUP_STAY:
+			return "AutoPickupStay"
+		TEST_SCENARIO_AUTO_PICKUP_EMPTY:
+			return "AutoPickupEmpty"
+		TEST_SCENARIO_AUTO_PICKUP_MULTI:
+			return "AutoPickupMulti"
+		TEST_SCENARIO_AUTO_PICKUP_MOVE:
+			return "AutoPickupMove"
+		TEST_SCENARIO_AUTO_PICKUP_CONFLICT:
+			return "AutoPickupConflict"
 		TEST_SCENARIO_THROW:
 			return "Throw"
 		TEST_SCENARIO_THROW_LOW_COIN:
@@ -885,8 +854,6 @@ func _format_intent_summary(intent: ActionIntent) -> String:
 	match intent.type:
 		ActionType.MOVE:
 			return "MOVE%s" % _format_vec2i(intent.target_pos)
-		ActionType.PICK:
-			return "PICK bag=%d" % intent.target_bag_id
 		ActionType.THROW:
 			return "THROW%s $%d" % [_format_vec2i(intent.target_pos), intent.throw_amount]
 		ActionType.STAY:
@@ -944,20 +911,20 @@ func _set_test_scenario(scenario_id: int) -> void:
 			test_mover_alive = true
 			test_mover_coins = 1
 			test_mover_entry_coins = 1
-		TEST_SCENARIO_PICK:
+		TEST_SCENARIO_AUTO_PICKUP_STAY:
 			player_grid = Vector2i(0, GRID_COUNT - 1)
 			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
 			test_enemy_alive = false
 			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
 			test_mover_alive = false
 			_add_test_bag(1001, player_grid, 3)
-		TEST_SCENARIO_PICK_EMPTY:
+		TEST_SCENARIO_AUTO_PICKUP_EMPTY:
 			player_grid = Vector2i(0, GRID_COUNT - 1)
 			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
 			test_enemy_alive = false
 			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
 			test_mover_alive = false
-		TEST_SCENARIO_PICK_MULTI:
+		TEST_SCENARIO_AUTO_PICKUP_MULTI:
 			player_grid = Vector2i(0, GRID_COUNT - 1)
 			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
 			test_enemy_alive = false
@@ -966,14 +933,14 @@ func _set_test_scenario(scenario_id: int) -> void:
 			_add_test_bag(1001, player_grid, 1)
 			_add_test_bag(1002, player_grid, 3)
 			_add_test_bag(1003, player_grid, 5)
-		TEST_SCENARIO_PICK_REMOTE:
+		TEST_SCENARIO_AUTO_PICKUP_MOVE:
 			player_grid = Vector2i(0, GRID_COUNT - 1)
 			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
 			test_enemy_alive = false
 			test_mover_grid = Vector2i(4, GRID_COUNT - 2)
 			test_mover_alive = false
 			_add_test_bag(1001, Vector2i(1, GRID_COUNT - 1), 3)
-		TEST_SCENARIO_PICK_CONFLICT:
+		TEST_SCENARIO_AUTO_PICKUP_CONFLICT:
 			player_grid = Vector2i(0, GRID_COUNT - 1)
 			test_enemy_grid = Vector2i(4, GRID_COUNT - 1)
 			test_enemy_alive = false
@@ -1140,38 +1107,6 @@ func _get_throw_amount(coins: int) -> int:
 	if coins <= 1:
 		return 0
 	return int(floor(float(coins) / 2.0))
-
-
-func _is_valid_pick_target(bag_id: int) -> bool:
-	var bag := _get_test_bag_by_id(bag_id)
-	return bag != null and bag.pos == player_grid
-
-
-func _get_clicked_bag_id(screen_position: Vector2) -> int:
-	for bag in test_bags:
-		if bag.pos != player_grid:
-			continue
-
-		var center := _get_bag_draw_center(bag)
-		if center.distance_to(screen_position) <= CELL_SIZE * 0.11:
-			return bag.id
-
-	return -1
-
-
-func _get_test_bag_by_id(bag_id: int) -> BagState:
-	for bag in test_bags:
-		if bag.id == bag_id:
-			return bag
-	return null
-
-
-func _is_clicking_any_bag(screen_position: Vector2) -> bool:
-	for bag in test_bags:
-		var center := _get_bag_draw_center(bag)
-		if center.distance_to(screen_position) <= CELL_SIZE * 0.11:
-			return true
-	return false
 
 
 func _draw_bag(bag: BagState) -> void:
