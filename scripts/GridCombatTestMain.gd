@@ -563,7 +563,7 @@ func _set_current_intent_throw(target: Vector2i) -> void:
 		current_player_intent = ActionIntent.new()
 		current_player_intent.actor_id = 1
 
-	var throw_amount := _get_throw_amount(player_coins)
+	var throw_amount := TurnResolver.standard_throw_amount(player_coins)
 	if throw_amount <= 0 or not _is_valid_throw_target(player_grid, target):
 		_set_current_intent_stay()
 		return
@@ -606,7 +606,7 @@ func _build_test_enemy_intent() -> ActionIntent:
 	elif current_test_scenario == TEST_SCENARIO_THROW_MULTI_HIT:
 		intent.type = ActionType.THROW
 		intent.target_pos = Vector2i(2, GRID_COUNT - 1)
-		intent.throw_amount = _get_throw_amount(test_enemy_coins)
+		intent.throw_amount = TurnResolver.standard_throw_amount(test_enemy_coins)
 	elif current_test_scenario == TEST_SCENARIO_PORTAL_CONFLICT:
 		intent.type = ActionType.STAY
 		intent.target_pos = test_enemy_grid
@@ -652,7 +652,7 @@ func _build_test_mover_intent() -> ActionIntent:
 		TEST_SCENARIO_PUSH_SAME, TEST_SCENARIO_PUSH_MIXED:
 			intent.type = ActionType.THROW
 			intent.target_pos = test_enemy_grid
-			intent.throw_amount = _get_throw_amount(test_mover_coins)
+			intent.throw_amount = TurnResolver.standard_throw_amount(test_mover_coins)
 
 	return intent
 
@@ -1101,12 +1101,6 @@ func _add_test_portal_pair(pair_id: int, entry_a: Vector2i, entry_b: Vector2i, c
 	tile_b.portal_pair_id = pair_id
 	tile_b.portal_color_id = color_id
 	test_tiles.append(tile_b)
-
-
-func _get_throw_amount(coins: int) -> int:
-	if coins <= 1:
-		return 0
-	return int(floor(float(coins) / 2.0))
 
 
 func _draw_bag(bag: BagState) -> void:

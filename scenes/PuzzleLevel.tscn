@@ -1,0 +1,102 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/ui/puzzle_level_view.gd" id="1_view"]
+[ext_resource type="Script" path="res://scripts/puzzle/ui/puzzle_board_view.gd" id="2_board"]
+[ext_resource type="Resource" path="res://levels/level_01.tres" id="3_level"]
+
+[node name="PuzzleLevel" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_view")
+level = ExtResource("3_level")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.051, 0.08, 0.13, 1)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Center/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+horizontal_alignment = 1
+
+[node name="Status" type="Label" parent="Center/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.66, 0.81, 0.95, 1)
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+
+[node name="Board" type="Control" parent="Center/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(520, 218)
+layout_mode = 2
+script = ExtResource("2_board")
+
+[node name="Hint" type="Label" parent="Center/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.66, 0.74, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "集齐棋盘上的金币 · 左键选移动 · 右键选投掷"
+horizontal_alignment = 1
+
+[node name="Intent" type="Label" parent="Center/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="Buttons" type="HBoxContainer" parent="Center/Content"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Stay" type="Button" parent="Center/Content/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(96, 42)
+layout_mode = 2
+text = "待机"
+
+[node name="Submit" type="Button" parent="Center/Content/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(144, 42)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.87, 1.0, 1)
+text = "结束回合"
+
+[node name="Restart" type="Button" parent="Center/Content/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(96, 42)
+layout_mode = 2
+text = "重开"
+
+[node name="Result" type="Label" parent="Center/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.98, 0.82, 0.53, 1)
+theme_override_font_sizes/font_size = 21
+horizontal_alignment = 1

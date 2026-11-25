@@ -43,7 +43,7 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 			unit.prev_pos = unit.pos
 			var intent: ActionIntent = intent_by_actor_id.get(unit.id)
 			if intent != null and intent.type == ActionType.MOVE:
-				if _is_valid_move_target(unit.pos, intent.target_pos, result.state_after.board_size):
+				if is_valid_move_target(unit.pos, intent.target_pos, result.state_after.board_size):
 					unit.pos = intent.target_pos
 					result.moved_unit_ids.append(unit.id)
 			conflict1_role = _get_conflict1_role(unit, intent)
@@ -360,7 +360,11 @@ func _get_conflict1_role(unit: UnitState, intent: ActionIntent) -> String:
 	return CONFLICT1_ROLE_NORMAL
 
 
-func _is_valid_move_target(from_pos: Vector2i, to_pos: Vector2i, board_size: Vector2i) -> bool:
+static func standard_throw_amount(coins: int) -> int:
+	return floori(coins / 2.0) if coins > 1 else 0
+
+
+static func is_valid_move_target(from_pos: Vector2i, to_pos: Vector2i, board_size: Vector2i) -> bool:
 	if not _is_inside_board(to_pos, board_size):
 		return false
 	return to_pos != from_pos and maxi(absi(to_pos.x - from_pos.x), absi(to_pos.y - from_pos.y)) <= 1
@@ -371,7 +375,7 @@ func _is_valid_throw_action(unit: UnitState, intent: ActionIntent, board_size: V
 		return false
 	if unit.coins <= intent.throw_amount:
 		return false
-	return _is_valid_throw_target(unit.pos, intent.target_pos, board_size)
+	return is_valid_throw_target(unit.pos, intent.target_pos, board_size)
 
 
 func _get_unit_conflict1_role(unit: UnitState, intent_by_actor_id: Dictionary) -> String:
@@ -404,7 +408,7 @@ func _pos_key(pos: Vector2i) -> String:
 	return "%s,%s" % [pos.x, pos.y]
 
 
-func _is_inside_board(pos: Vector2i, board_size: Vector2i) -> bool:
+static func _is_inside_board(pos: Vector2i, board_size: Vector2i) -> bool:
 	return (
 		pos.x >= 0
 		and pos.y >= 0
@@ -413,7 +417,7 @@ func _is_inside_board(pos: Vector2i, board_size: Vector2i) -> bool:
 	)
 
 
-func _is_valid_throw_target(from_pos: Vector2i, to_pos: Vector2i, board_size: Vector2i) -> bool:
+static func is_valid_throw_target(from_pos: Vector2i, to_pos: Vector2i, board_size: Vector2i) -> bool:
 	if not _is_inside_board(to_pos, board_size):
 		return false
 

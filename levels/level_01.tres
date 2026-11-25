@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_sentry_policy.gd" id="3_sentry"]
+
+[sub_resource type="Resource" id="Resource_sentry"]
+script = ExtResource("3_sentry")
+
+[sub_resource type="Resource" id="Resource_guard"]
+script = ExtResource("2_spawn")
+cell = Vector2i(1, 0)
+coins = 1
+policy = SubResource("Resource_sentry")
+
+[resource]
+script = ExtResource("1_level")
+title = "01 · 边缘守卫"
+board_size = Vector2i(2, 1)
+player_coins = 5
+enemies = Array[ExtResource("2_spawn")]([SubResource("Resource_guard")])
+optimal_turns = 2

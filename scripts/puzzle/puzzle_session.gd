@@ -1,0 +1,90 @@
+class_name PuzzleSession
+extends RefCounted
+
+signal level_won(collected_coins: int, turns: int, score: float)
+signal level_lost(turns: int)
+
+enum Phase { IDLE, ACTIVE, WON, LOST }
+
+var last_error := ""
+
+var _phase: Phase = Phase.IDLE
+var _target_coins: int
+
+var _board: GameState
+var _starting_coins: int
+var _resolver := TurnResolver.new()
+var _enemy_policies: Dictionary[int, PuzzleEnemyPolicy] = {}
+
+
+func start_level(level: PuzzleLevelData) -> bool:
+	last_error = "缺少关卡数据。" if level == null else level.validation_error()
+	if last_error != "":
+		return false
+
+	_board = level.build_board()
+	_starting_coins = level.player_coins
+	_target_coins = 0
+	for unit in _board.units:
+		_target_coins += unit.coins
+	for bag in _board.bags:
+		_target_coins += bag.coins
+
+	_enemy_policies.clear()
+	for index in level.enemies.size():
+		_enemy_policies[index + 2] = level.enemies[index].policy.duplicate(true) as PuzzleEnemyPolicy
+	_phase = Phase.ACTIVE
+	return true
+
+
+func get_phase() -> Phase:
+	return _phase
+
+
+func get_target_coins() -> int:
+	return _target_coins
+
+
+func get_board_snapshot() -> GameState:
+	return _board.duplicate_state() if _board != null else null
+
+
+func submit_turn(action_type: String, target: Vector2i = Vector2i.ZERO) -> bool:
+	if _phase != Phase.ACTIVE:
+		return false
+
+	var player_intent := PuzzleActions.create_intent(_board, PuzzleLevelData.PLAYER_ID, action_type, target)
+	if player_intent == null:
+		last_error = "该动作当前不可执行。"
+		return false
+
+	var intents: Array[ActionIntent] = [player_intent]
+	for unit in _board.units:
+		if unit.id == PuzzleLevelData.PLAYER_ID or not unit.alive or unit.won:
+			continue
+		if unit.stun_turns > 0:
+			intents.append(PuzzleActions.create_intent(_board, unit.id, ActionType.STAY))
+			continue
+		# Each policy sees an isolated copy of the same starting board.
+		var proposed := _enemy_policies[unit.id].choose_intent(_board.duplicate_state(), unit.id, PuzzleLevelData.PLAYER_ID)
+		if proposed == null or proposed.actor_id != unit.id:
+			last_error = "敌人 %d 没有给出有效指令。" % unit.id
+			return false
+		var checked := PuzzleActions.create_intent(_board, unit.id, proposed.type, proposed.target_pos)
+		if checked == null or checked.throw_amount != proposed.throw_amount:
+			last_error = "敌人 %d 的行动不符合规则。" % unit.id
+			return false
+		intents.append(checked)
+
+	last_error = ""
+	_board = _resolver.resolve_turn(_board, intents).state_after
+	var player := _board.get_unit_by_id(PuzzleLevelData.PLAYER_ID)
+	var turns := _board.turn_index
+	if not player.alive:
+		_phase = Phase.LOST
+		level_lost.emit(turns)
+	elif player.coins == _target_coins:
+		_phase = Phase.WON
+		var collected := player.coins - _starting_coins
+		level_won.emit(collected, turns, float(collected) / turns)
+	return true
