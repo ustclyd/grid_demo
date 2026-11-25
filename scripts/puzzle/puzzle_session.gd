@@ -49,6 +49,27 @@ func get_board_snapshot() -> GameState:
 	return _board.duplicate_state() if _board != null else null
 
 
+func preview_enemy_intent(unit_id: int) -> ActionIntent:
+	if _phase != Phase.ACTIVE or not _enemy_policies.has(unit_id):
+		return null
+	var unit := _board.get_unit_by_id(unit_id)
+	if not unit.alive or unit.won:
+		return null
+	if unit.stun_turns > 0:
+		return PuzzleActions.create_intent(_board, unit_id, ActionType.STAY)
+
+	# Each policy sees an isolated copy of the same starting board.
+	var proposed := _enemy_policies[unit_id].choose_intent(
+		_board.duplicate_state(), unit_id, PuzzleLevelData.PLAYER_ID
+	)
+	if proposed == null or proposed.actor_id != unit_id:
+		return null
+	var checked := PuzzleActions.create_intent(_board, unit_id, proposed.type, proposed.target_pos)
+	if checked == null or checked.throw_amount != proposed.throw_amount:
+		return null
+	return checked
+
+
 func submit_turn(action_type: String, target: Vector2i = Vector2i.ZERO) -> bool:
 	if _phase != Phase.ACTIVE:
 		return false
@@ -62,19 +83,11 @@ func submit_turn(action_type: String, target: Vector2i = Vector2i.ZERO) -> bool:
 	for unit in _board.units:
 		if unit.id == PuzzleLevelData.PLAYER_ID or not unit.alive or unit.won:
 			continue
-		if unit.stun_turns > 0:
-			intents.append(PuzzleActions.create_intent(_board, unit.id, ActionType.STAY))
-			continue
-		# Each policy sees an isolated copy of the same starting board.
-		var proposed := _enemy_policies[unit.id].choose_intent(_board.duplicate_state(), unit.id, PuzzleLevelData.PLAYER_ID)
-		if proposed == null or proposed.actor_id != unit.id:
-			last_error = "敌人 %d 没有给出有效指令。" % unit.id
-			return false
-		var checked := PuzzleActions.create_intent(_board, unit.id, proposed.type, proposed.target_pos)
-		if checked == null or checked.throw_amount != proposed.throw_amount:
+		var intent := preview_enemy_intent(unit.id)
+		if intent == null:
 			last_error = "敌人 %d 的行动不符合规则。" % unit.id
 			return false
-		intents.append(checked)
+		intents.append(intent)
 
 	last_error = ""
 	_board = _resolver.resolve_turn(_board, intents).state_after

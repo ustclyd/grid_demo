@@ -4,10 +4,12 @@ extends Control
 
 var _session := PuzzleSession.new()
 var _selection: ActionIntent
+var _enemy_names: Dictionary[int, String] = {}
 
 @onready var _title: Label = %Title
 @onready var _status: Label = %Status
 @onready var _intent_label: Label = %Intent
+@onready var _rules: Label = %LevelRules
 @onready var _result: Label = %Result
 @onready var _board_view: PuzzleBoardView = %Board
 @onready var _stay_button: Button = %Stay
@@ -28,6 +30,8 @@ func _ready() -> void:
 func _restart() -> void:
 	_result.hide()
 	_selection = null
+	_enemy_names.clear()
+	_rules.hide()
 	if not _session.start_level(level):
 		_board_view.present(null, null)
 		_status.text = ""
@@ -36,6 +40,11 @@ func _restart() -> void:
 		_stay_button.disabled = true
 		return
 	_title.text = level.title
+	_rules.text = level.play_hint
+	_rules.visible = not level.play_hint.is_empty()
+	_board_view.custom_minimum_size.y = clampf(level.board_size.y * 130.0, 218.0, 390.0)
+	for index in level.enemies.size():
+		_enemy_names[index + 2] = level.enemies[index].policy.get_display_name()
 	_select_stay()
 
 
@@ -89,7 +98,12 @@ func _refresh() -> void:
 		_intent_label.text = _selection_text(player)
 	else:
 		_intent_label.text = ""
-	_board_view.present(board, _selection)
+	var enemy_intents: Dictionary[int, ActionIntent] = {}
+	for unit_id in _enemy_names:
+		var intent := _session.preview_enemy_intent(unit_id)
+		if intent != null:
+			enemy_intents[unit_id] = intent
+	_board_view.present(board, _selection, _enemy_names, enemy_intents)
 
 
 func _selection_text(player: UnitState) -> String:

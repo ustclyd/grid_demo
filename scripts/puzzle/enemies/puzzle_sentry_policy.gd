@@ -2,6 +2,10 @@ class_name PuzzleSentryPolicy
 extends PuzzleEnemyPolicy
 
 
+func get_display_name() -> String:
+	return "守卫"
+
+
 func is_available() -> bool:
 	return kind == Kind.SENTRY
 

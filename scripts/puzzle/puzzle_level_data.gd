@@ -4,6 +4,7 @@ extends Resource
 const PLAYER_ID := 1
 
 @export var title := ""
+@export_multiline var play_hint := ""
 @export var board_size := Vector2i(2, 1)
 @export var player_cell := Vector2i.ZERO
 @export var player_coins: int = 0

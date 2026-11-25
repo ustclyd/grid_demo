@@ -24,6 +24,10 @@ enum Kind {
 @export var kind: Kind = Kind.SENTRY
 
 
+func get_display_name() -> String:
+	return "敌人"
+
+
 func is_available() -> bool:
 	return false
 

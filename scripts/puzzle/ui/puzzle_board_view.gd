@@ -11,11 +11,20 @@ const COIN_COLOR := Color("#f8cd73")
 
 var _board: GameState
 var _selection: ActionIntent
+var _enemy_names: Dictionary[int, String]
+var _enemy_intents: Dictionary[int, ActionIntent]
 
 
-func present(board: GameState, selection: ActionIntent) -> void:
+func present(
+	board: GameState,
+	selection: ActionIntent,
+	enemy_names: Dictionary[int, String] = {},
+	enemy_intents: Dictionary[int, ActionIntent] = {},
+) -> void:
 	_board = board
 	_selection = selection
+	_enemy_names = enemy_names
+	_enemy_intents = enemy_intents
 	queue_redraw()
 
 
@@ -51,6 +60,8 @@ func _draw() -> void:
 			var cell := Vector2i(x, y)
 			var rect := Rect2(origin + Vector2(cell) * side, Vector2.ONE * side).grow(-2.0)
 			draw_rect(rect, LIGHT_TILE if (x + y) % 2 == 0 else DARK_TILE)
+			var coordinate_center := origin + (Vector2(cell) + Vector2(0.17, 0.16)) * side
+			_draw_label(coordinate_center, _cell_name(cell), side * 0.12, Color("#a1b5cb"))
 			if _selection != null and _selection.target_pos == cell:
 				var color := COIN_COLOR if _selection.type == ActionType.THROW else PLAYER_COLOR
 				draw_rect(rect, color, false, 3.0)
@@ -70,9 +81,24 @@ func _draw() -> void:
 		var color := PLAYER_COLOR if is_player else ENEMY_COLOR
 		draw_circle(center, side * 0.22, color)
 		_draw_label(center, str(unit.coins), side * 0.19, Color("#101d2c"))
-		_draw_label(center + Vector2(0.0, -side * 0.34), "玩家" if is_player else "敌人", side * 0.12, color)
+		var name_text: String = "玩家" if is_player else _enemy_names.get(unit.id, "敌人")
+		_draw_label(center + Vector2(0.0, -side * 0.30), name_text, side * 0.12, color)
 		if unit.stun_turns > 0:
-			_draw_label(center + Vector2(0.0, side * 0.35), "硬直", side * 0.12, COIN_COLOR)
+			_draw_label(center + Vector2(0.0, side * 0.33), "硬直", side * 0.12, COIN_COLOR)
+		elif _enemy_intents.has(unit.id):
+			var intent := _enemy_intents[unit.id]
+			var preview := "待机"
+			if intent.type == ActionType.MOVE:
+				preview = "→ " + _cell_name(intent.target_pos)
+			elif intent.type == ActionType.THROW:
+				preview = "投 " + _cell_name(intent.target_pos)
+			_draw_label(center + Vector2(0.0, side * 0.33), preview, side * 0.12, color)
+
+
+func _cell_name(cell: Vector2i) -> String:
+	if cell.x < 26:
+		return "%s%d" % [char(65 + cell.x), cell.y + 1]
+	return "(%d,%d)" % [cell.x + 1, cell.y + 1]
 
 
 func _cell_size() -> float:
