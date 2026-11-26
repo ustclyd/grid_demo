@@ -22,11 +22,11 @@ static func create_intent(
 		ActionType.STAY:
 			intent.target_pos = unit.pos
 		ActionType.MOVE:
-			if not TurnResolver.is_valid_move_target(unit.pos, target, board.board_size):
+			if not TurnResolver.can_step(board, unit, target):
 				return null
 		ActionType.THROW:
 			intent.throw_amount = TurnResolver.standard_throw_amount(unit.coins)
-			if intent.throw_amount == 0 or not TurnResolver.is_valid_throw_target(unit.pos, target, board.board_size):
+			if intent.throw_amount == 0 or not TurnResolver.can_aim_throw(board, unit, target):
 				return null
 		_:
 			return null

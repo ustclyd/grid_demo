@@ -59,7 +59,16 @@ func _draw() -> void:
 		for x in _board.board_size.x:
 			var cell := Vector2i(x, y)
 			var rect := Rect2(origin + Vector2(cell) * side, Vector2.ONE * side).grow(-2.0)
-			draw_rect(rect, LIGHT_TILE if (x + y) % 2 == 0 else DARK_TILE)
+			var tile_color := LIGHT_TILE if (x + y) % 2 == 0 else DARK_TILE
+			if _board.trail != null:
+				if not _board.trail.is_floor(cell):
+					continue
+				if _board.trail.has_left(cell):
+					tile_color = Color("#252830")
+			draw_rect(rect, tile_color)
+			if _board.trail != null and cell == _board.trail.exit_cell:
+				draw_rect(rect.grow(-2.0), COIN_COLOR, false, 2.0)
+				_draw_label(rect.position + rect.size * Vector2(0.80, 0.17), "终", side * 0.17, COIN_COLOR)
 			var coordinate_center := origin + (Vector2(cell) + Vector2(0.17, 0.16)) * side
 			_draw_label(coordinate_center, _cell_name(cell), side * 0.12, Color("#a1b5cb"))
 			if _selection != null and _selection.target_pos == cell:

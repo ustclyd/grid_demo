@@ -22,6 +22,8 @@ class Position:
 # For terrain-free levels whose enemy policies depend only on the current board.
 # Terrain timers or turn-dependent policies would need additional state in the key.
 static func inspect(level: PuzzleLevelData) -> Dictionary:
+	if not level.trail_cells.is_empty():
+		return {}
 	var start := PuzzleSession.new()
 	if not start.start_level(level):
 		return {}

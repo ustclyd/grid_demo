@@ -43,7 +43,7 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 			unit.prev_pos = unit.pos
 			var intent: ActionIntent = intent_by_actor_id.get(unit.id)
 			if intent != null and intent.type == ActionType.MOVE:
-				if is_valid_move_target(unit.pos, intent.target_pos, result.state_after.board_size):
+				if can_step(result.state_after, unit, intent.target_pos):
 					unit.pos = intent.target_pos
 					result.moved_unit_ids.append(unit.id)
 			conflict1_role = _get_conflict1_role(unit, intent)
@@ -67,6 +67,12 @@ func resolve_turn(state: GameState, intents: Array[ActionIntent]) -> TurnResult:
 	if _map_rules != null:
 		_map_rules.apply_turn_end(result)
 
+	if result.state_after.trail != null:
+		var player_before := state.get_unit_by_id(PuzzleTrail.PLAYER_ID)
+		var player_after := result.state_after.get_unit_by_id(PuzzleTrail.PLAYER_ID)
+		if player_after.alive and player_after.pos != player_before.pos:
+			result.state_after.trail.leave(player_before.pos)
+
 	return result
 
 
@@ -89,7 +95,7 @@ func _resolve_throw_phase(state_after: GameState, intent_by_actor_id: Dictionary
 			continue
 
 		var throw_amount := intent.throw_amount
-		if not _is_valid_throw_action(unit, intent, state_after.board_size):
+		if not _is_valid_throw_action(state_after, unit, intent):
 			continue
 
 		unit.coins -= throw_amount
@@ -133,7 +139,7 @@ func _resolve_throw_knockback_phase(
 			continue
 
 		var destination := _get_knockback_destination(
-			survivor, directions_by_target[target], state_after.board_size, intent_by_actor_id,
+			survivor, directions_by_target[target], state_after, intent_by_actor_id,
 		)
 		destinations[survivor.id] = destination
 		result.knocked_back_unit_ids.append(survivor.id)
@@ -169,7 +175,7 @@ func _resolve_throw_knockback_phase(
 func _get_knockback_destination(
 	unit: UnitState,
 	direction: Vector2i,
-	board_size: Vector2i,
+	board: GameState,
 	intent_by_actor_id: Dictionary,
 ) -> Vector2i:
 	if unit.stun_turns > 0:
@@ -181,7 +187,7 @@ func _get_knockback_destination(
 		return unit.prev_pos
 
 	var pushed_pos := unit.pos + direction
-	return pushed_pos if _is_inside_board(pushed_pos, board_size) else unit.pos
+	return pushed_pos if can_step(board, unit, pushed_pos) else unit.pos
 
 
 func _resolve_conflict_phase_one(conflict_groups: Dictionary, intent_by_actor_id: Dictionary, result: TurnResult) -> void:
@@ -370,12 +376,26 @@ static func is_valid_move_target(from_pos: Vector2i, to_pos: Vector2i, board_siz
 	return to_pos != from_pos and maxi(absi(to_pos.x - from_pos.x), absi(to_pos.y - from_pos.y)) <= 1
 
 
-func _is_valid_throw_action(unit: UnitState, intent: ActionIntent, board_size: Vector2i) -> bool:
+static func can_step(board: GameState, unit: UnitState, target: Vector2i) -> bool:
+	return (
+		is_valid_move_target(unit.pos, target, board.board_size)
+		and (board.trail == null or board.trail.allows_step(unit.pos, target, unit.id))
+	)
+
+
+static func can_aim_throw(board: GameState, unit: UnitState, target: Vector2i) -> bool:
+	return (
+		is_valid_throw_target(unit.pos, target, board.board_size)
+		and (board.trail == null or board.trail.is_floor(target))
+	)
+
+
+func _is_valid_throw_action(board: GameState, unit: UnitState, intent: ActionIntent) -> bool:
 	if intent.throw_amount <= 0:
 		return false
 	if unit.coins <= intent.throw_amount:
 		return false
-	return is_valid_throw_target(unit.pos, intent.target_pos, board_size)
+	return can_aim_throw(board, unit, intent.target_pos)
 
 
 func _get_unit_conflict1_role(unit: UnitState, intent_by_actor_id: Dictionary) -> String:

@@ -107,7 +107,7 @@ func submit_turn(action_type: String, target: Vector2i = Vector2i.ZERO) -> bool:
 	if not player.alive:
 		_phase = Phase.LOST
 		level_lost.emit(turns)
-	elif player.coins == _target_coins:
+	elif player.coins == _target_coins and (_board.trail == null or _board.trail.is_complete(player.pos)):
 		_phase = Phase.WON
 		var collected := player.coins - _starting_coins
 		level_won.emit(collected, turns, float(collected) / turns)

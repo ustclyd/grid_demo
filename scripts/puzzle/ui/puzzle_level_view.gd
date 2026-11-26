@@ -42,7 +42,10 @@ func _restart() -> void:
 	_title.text = level.title
 	_rules.text = level.play_hint
 	_rules.visible = not level.play_hint.is_empty()
-	_board_view.custom_minimum_size.y = clampf(level.board_size.y * 130.0, 218.0, 390.0)
+	var has_trail := not level.trail_cells.is_empty()
+	_board_view.custom_minimum_size = Vector2(580, 555) if has_trail else Vector2(
+		520, clampf(level.board_size.y * 130.0, 218.0, 390.0)
+	)
 	for index in level.enemies.size():
 		_enemy_names[index + 2] = level.enemies[index].policy.get_display_name()
 	_select_stay()
@@ -60,7 +63,10 @@ func _on_cell_clicked(cell: Vector2i, button: MouseButton) -> void:
 	var action_type := ActionType.MOVE if button == MOUSE_BUTTON_LEFT else ActionType.THROW
 	var intent := PuzzleActions.create_intent(board, player.id, action_type, cell)
 	if intent == null:
-		_intent_label.text = "该格不可执行此动作，保留上一次选择。"
+		if board.trail != null and board.trail.has_left(cell) and action_type == ActionType.MOVE:
+			_intent_label.text = "该格已封闭。仍保留上一次选择。"
+		else:
+			_intent_label.text = "该格不可执行此动作，保留上一次选择。"
 		return
 	_selection = intent
 	_refresh()
@@ -91,6 +97,8 @@ func _refresh() -> void:
 	var board := _session.get_board_snapshot()
 	var player := board.get_unit_by_id(PuzzleLevelData.PLAYER_ID)
 	_status.text = "回合 %d    持币 %d / %d" % [board.turn_index, player.coins, _session.get_target_coins()]
+	if board.trail != null:
+		_status.text += "    未踏 %d" % board.trail.remaining_cells()
 	var active := _session.get_phase() == PuzzleSession.Phase.ACTIVE
 	_stay_button.disabled = not active
 	_submit_button.disabled = not active

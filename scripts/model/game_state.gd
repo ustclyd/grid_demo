@@ -8,6 +8,7 @@ var units: Array[UnitState] = []
 var bags: Array[BagState] = []
 var ultimate_bag_id: int = -1
 var map_state := GridMapState.new()
+var trail: PuzzleTrail
 
 
 func get_unit_by_id(unit_id: int) -> UnitState:
@@ -30,6 +31,8 @@ func duplicate_state() -> GameState:
 	copy.turn_index = turn_index
 	copy.ultimate_bag_id = ultimate_bag_id
 	copy.map_state = map_state.duplicate_state()
+	if trail != null:
+		copy.trail = trail.duplicate_state()
 
 	for unit in units:
 		copy.units.append(unit.duplicate_state())
