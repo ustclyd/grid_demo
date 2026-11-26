@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="2_enemy"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_sentry_policy.gd" id="3_sentry"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_straight_mover_policy.gd" id="4_mover"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_pursuer_policy.gd" id="5_pursuer"]
+
+[sub_resource type="Resource" id="Resource_sentry"]
+script = ExtResource("3_sentry")
+
+[sub_resource type="Resource" id="Resource_mover"]
+script = ExtResource("4_mover")
+kind = 1
+direction = Vector2i(0, 1)
+
+[sub_resource type="Resource" id="Resource_pursuer"]
+script = ExtResource("5_pursuer")
+kind = 4
+
+[sub_resource type="Resource" id="Resource_south_guard"]
+script = ExtResource("2_enemy")
+cell = Vector2i(1, 2)
+coins = 1
+policy = SubResource("Resource_sentry")
+
+[sub_resource type="Resource" id="Resource_mover_spawn"]
+script = ExtResource("2_enemy")
+cell = Vector2i(0, 0)
+coins = 1
+policy = SubResource("Resource_mover")
+
+[sub_resource type="Resource" id="Resource_pursuer_spawn"]
+script = ExtResource("2_enemy")
+cell = Vector2i(2, 2)
+coins = 1
+policy = SubResource("Resource_pursuer")
+
+[sub_resource type="Resource" id="Resource_north_guard"]
+script = ExtResource("2_enemy")
+cell = Vector2i(1, 0)
+coins = 1
+policy = SubResource("Resource_sentry")
+
+[resource]
+script = ExtResource("1_level")
+title = "05 · 迟一步"
+play_hint = "定向兵每回合向下走一格，遇边待机
+追兵朝你回合开始的位置走一步 · 守卫原地待机"
+board_size = Vector2i(3, 3)
+player_cell = Vector2i(2, 0)
+enemies = Array[ExtResource("2_enemy")]([SubResource("Resource_south_guard"), SubResource("Resource_mover_spawn"), SubResource("Resource_pursuer_spawn"), SubResource("Resource_north_guard")])
+optimal_turns = 9
