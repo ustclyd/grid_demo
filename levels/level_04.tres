@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="2_enemy"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_bag_spawn.gd" id="3_bag"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_sentry_policy.gd" id="4_sentry"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_aimed_thrower_policy.gd" id="5_thrower"]
+
+[sub_resource type="Resource" id="Resource_sentry"]
+script = ExtResource("4_sentry")
+
+[sub_resource type="Resource" id="Resource_thrower"]
+script = ExtResource("5_thrower")
+kind = 9
+
+[sub_resource type="Resource" id="Resource_guard_spawn"]
+script = ExtResource("2_enemy")
+cell = Vector2i(2, 0)
+coins = 1
+policy = SubResource("Resource_sentry")
+
+[sub_resource type="Resource" id="Resource_loaded_thrower"]
+script = ExtResource("2_enemy")
+cell = Vector2i(1, 2)
+coins = 2
+policy = SubResource("Resource_thrower")
+
+[sub_resource type="Resource" id="Resource_light_thrower"]
+script = ExtResource("2_enemy")
+cell = Vector2i(2, 2)
+coins = 1
+policy = SubResource("Resource_thrower")
+
+[sub_resource type="Resource" id="Resource_bag"]
+script = ExtResource("3_bag")
+cell = Vector2i(1, 0)
+coins = 1
+
+[resource]
+script = ExtResource("1_level")
+title = "04 · 空手开局"
+play_hint = "投手瞄准玩家回合开始时的格子，不能投就待机
+投掷至少要有 2 币 · 首次冲突中，主动待机优先"
+board_size = Vector2i(3, 3)
+player_cell = Vector2i(0, 0)
+player_coins = 0
+enemies = Array[ExtResource("2_enemy")]([SubResource("Resource_guard_spawn"), SubResource("Resource_loaded_thrower"), SubResource("Resource_light_thrower")])
+bags = Array[ExtResource("3_bag")]([SubResource("Resource_bag")])
+optimal_turns = 9

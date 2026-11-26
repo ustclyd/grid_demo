@@ -49,6 +49,17 @@ func get_board_snapshot() -> GameState:
 	return _board.duplicate_state() if _board != null else null
 
 
+func fork() -> PuzzleSession:
+	var branch := PuzzleSession.new()
+	branch._phase = _phase
+	branch._target_coins = _target_coins
+	branch._starting_coins = _starting_coins
+	# The resolver replaces the board with a new state, and callers only receive snapshots.
+	branch._board = _board
+	branch._enemy_policies = _enemy_policies.duplicate()
+	return branch
+
+
 func preview_enemy_intent(unit_id: int) -> ActionIntent:
 	if _phase != Phase.ACTIVE or not _enemy_policies.has(unit_id):
 		return null
