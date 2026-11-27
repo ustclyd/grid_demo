@@ -77,6 +77,11 @@ func _draw() -> void:
 
 	var bags_by_cell := {}
 	for bag in _board.bags:
+		if bag.is_vault():
+			var label_center := origin + (Vector2(bag.pos) + Vector2(0.72, 0.11)) * side
+			var vault_text := "库%d→+%d" % [bag.required_coins, bag.coins]
+			_draw_label(label_center, vault_text, side * 0.12, COIN_COLOR)
+			continue
 		bags_by_cell[bag.pos] = bags_by_cell.get(bag.pos, 0) + bag.coins
 	for cell in bags_by_cell:
 		var center := origin + (Vector2(cell) + Vector2(0.25, 0.78)) * side

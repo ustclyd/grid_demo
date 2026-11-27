@@ -20,7 +20,7 @@ func choose_intent(board: GameState, unit_id: int, player_id: int) -> ActionInte
 	var target := Vector2i(-1, -1)
 	var best_distance := board.board_size.x + board.board_size.y
 	for bag in board.bags:
-		if occupied.has(bag.pos):
+		if bag.is_vault() or occupied.has(bag.pos):
 			continue
 		var distance := _distance(unit.pos, bag.pos)
 		var comes_first := bag.pos.y < target.y or (bag.pos.y == target.y and bag.pos.x < target.x)

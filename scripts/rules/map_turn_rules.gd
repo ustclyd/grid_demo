@@ -225,6 +225,8 @@ func _resolve_exit_reservations(state_after: GameState, result: TurnResult) -> v
 		})
 
 	for bag in state_after.bags:
+		if bag.is_vault():
+			continue
 		var tile := state_after.map_state.get_tile_at(bag.pos)
 		if tile == null or tile.tile_type != TileType.EXIT_PORTAL:
 			continue
@@ -271,6 +273,8 @@ func _resolve_portal_reservations(state_after: GameState, result: TurnResult) ->
 		})
 
 	for bag in state_after.bags:
+		if bag.is_vault():
+			continue
 		var tile := state_after.map_state.get_tile_at(bag.pos)
 		if tile == null or tile.tile_type != TileType.PORTAL:
 			continue

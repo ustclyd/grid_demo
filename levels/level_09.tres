@@ -1,0 +1,92 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_sentry_policy.gd" id="3_guard"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_bouncer_policy.gd" id="4_bouncer"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_watcher_policy.gd" id="5_watcher"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_bag_spawn.gd" id="6_bag"]
+
+[sub_resource type="Resource" id="guard"]
+script = ExtResource("3_guard")
+
+[sub_resource type="Resource" id="bouncer"]
+script = ExtResource("4_bouncer")
+kind = 2
+endpoint_a = Vector2i(4, 0)
+endpoint_b = Vector2i(3, 0)
+
+[sub_resource type="Resource" id="watcher"]
+script = ExtResource("5_watcher")
+kind = 6
+
+[sub_resource type="Resource" id="guard_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(1, 0)
+coins = 1
+policy = SubResource("guard")
+
+[sub_resource type="Resource" id="bouncer_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(4, 0)
+coins = 3
+policy = SubResource("bouncer")
+
+[sub_resource type="Resource" id="watcher_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(4, 3)
+coins = 4
+policy = SubResource("watcher")
+
+[sub_resource type="Resource" id="loose_c3"]
+script = ExtResource("6_bag")
+cell = Vector2i(2, 2)
+coins = 3
+
+[sub_resource type="Resource" id="vault_a4"]
+script = ExtResource("6_bag")
+cell = Vector2i(0, 3)
+coins = 1
+required_coins = 8
+
+[sub_resource type="Resource" id="vault_b3"]
+script = ExtResource("6_bag")
+cell = Vector2i(1, 2)
+coins = 2
+required_coins = 2
+
+[sub_resource type="Resource" id="vault_c1"]
+script = ExtResource("6_bag")
+cell = Vector2i(2, 0)
+coins = 3
+required_coins = 6
+
+[sub_resource type="Resource" id="vault_c4"]
+script = ExtResource("6_bag")
+cell = Vector2i(2, 3)
+coins = 3
+required_coins = 6
+
+[sub_resource type="Resource" id="vault_d1"]
+script = ExtResource("6_bag")
+cell = Vector2i(3, 0)
+coins = 2
+required_coins = 3
+
+[sub_resource type="Resource" id="vault_d3"]
+script = ExtResource("6_bag")
+cell = Vector2i(3, 2)
+coins = 1
+required_coins = 6
+
+[resource]
+script = ExtResource("1_level")
+title = "09 · 六库·往返"
+play_hint = "金库「库3→+2」表示恰持 3 币可领 2 币，结算先拾散币
+移动或主动待机后留在目标格并生还，就能开库，敌人也能开
+守卫待机 · 折返兵往返 E1 / D1 · 警戒兵只追回合开始时相邻的玩家"
+board_size = Vector2i(5, 4)
+player_cell = Vector2i(3, 1)
+player_coins = 3
+enemies = Array[ExtResource("2_spawn")]([SubResource("guard_spawn"), SubResource("bouncer_spawn"), SubResource("watcher_spawn")])
+bags = Array[ExtResource("6_bag")]([SubResource("loose_c3"), SubResource("vault_a4"), SubResource("vault_b3"), SubResource("vault_c1"), SubResource("vault_c4"), SubResource("vault_d1"), SubResource("vault_d3")])

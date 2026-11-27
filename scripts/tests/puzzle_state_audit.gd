@@ -153,6 +153,11 @@ static func _key(board: GameState) -> String:
 	# Entry coins and unit order are fixed. Ordinary bag IDs and split bags do not affect play.
 	var coins_by_cell := PackedInt32Array()
 	coins_by_cell.resize(board.board_size.x * board.board_size.y)
+	var vaults := PackedStringArray()
 	for bag in board.bags:
+		if bag.is_vault():
+			vaults.append("%s/%d/%d" % [bag.pos, bag.required_coins, bag.coins])
+			continue
 		coins_by_cell[bag.pos.y * board.board_size.x + bag.pos.x] += bag.coins
-	return "|".join(units) + str(coins_by_cell)
+	vaults.sort()
+	return "|".join(units) + str(coins_by_cell) + "|".join(vaults)

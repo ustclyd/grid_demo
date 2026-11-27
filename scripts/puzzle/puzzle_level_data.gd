@@ -49,10 +49,17 @@ func validation_error() -> String:
 			return "第 %d 个敌人的出生格与行动路线不匹配。" % (index + 1)
 		occupied[enemy.cell] = true
 		available_coins += enemy.coins
+	var vault_cells: Dictionary[Vector2i, bool] = {}
 	for index in bags.size():
 		var bag := bags[index]
 		if bag == null or not bounds.has_point(bag.cell) or bag.coins <= 0:
 			return "第 %d 个钱袋的位置或金额无效。" % (index + 1)
+		if bag.required_coins < -1:
+			return "第 %d 个钱袋的金库门槛无效。" % (index + 1)
+		if bag.required_coins >= 0:
+			if vault_cells.has(bag.cell):
+				return "一个格子最多放一个金库。"
+			vault_cells[bag.cell] = true
 		if trail != null and not trail.is_floor(bag.cell):
 			return "第 %d 个钱袋必须放在可行走格。" % (index + 1)
 		available_coins += bag.coins
@@ -76,6 +83,7 @@ func build_board() -> GameState:
 		bag.id = index + 1
 		bag.pos = spawn.cell
 		bag.coins = spawn.coins
+		bag.required_coins = spawn.required_coins
 		board.bags.append(bag)
 	return board
 

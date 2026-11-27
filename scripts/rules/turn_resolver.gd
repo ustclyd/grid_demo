@@ -285,20 +285,34 @@ func _resolve_auto_pickups(
 			collectors_by_cell[unit.pos] = unit
 
 	var remaining_bags: Array[BagState] = []
+	var vaults: Array[BagState] = []
 	for bag in state_after.bags:
+		if bag.is_vault():
+			vaults.append(bag)
+			continue
 		var collector: UnitState = collectors_by_cell.get(bag.pos)
 		if collector == null:
 			remaining_bags.append(bag)
-			continue
+		else:
+			_collect_bag(collector, bag, result)
 
-		collector.coins += bag.coins
-		result.picked_bag_records.append({
-			"unit_id": collector.id,
-			"bag_id": bag.id,
-			"coins": bag.coins,
-		})
-
+	# Check the purse only after all loose coins and combat drops are collected.
+	for vault in vaults:
+		var collector: UnitState = collectors_by_cell.get(vault.pos)
+		if collector != null and collector.coins == vault.required_coins:
+			_collect_bag(collector, vault, result)
+		else:
+			remaining_bags.append(vault)
 	state_after.bags = remaining_bags
+
+
+func _collect_bag(collector: UnitState, bag: BagState, result: TurnResult) -> void:
+	collector.coins += bag.coins
+	result.picked_bag_records.append({
+		"unit_id": collector.id,
+		"bag_id": bag.id,
+		"coins": bag.coins,
+	})
 
 
 func _get_next_bag_id(state_after: GameState) -> int:
