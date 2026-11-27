@@ -1,55 +1,93 @@
-# Commit helper script.
-# Steps:
-# 1. git add .
-# 2. git commit -m "message"
-# 3. optional git push when -Push is provided
-#
-# Push behavior:
-# - If the current branch already has an upstream, run `git push`
-# - If the current branch does not have an upstream yet, run
-#   `git push -u origin <current-branch>`
+# Commit from the project root. With -PushOnly, upload existing commits.
+# A repository can opt a development branch into publishing to origin's default
+# branch with: git config --local gridDemo.contributionBranch <branch>
 
-# Parameters:
-# -Message : required commit message
-# -Push    : optional switch, runs git push after commit
+[CmdletBinding(DefaultParameterSetName = 'Commit')]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = 'Commit')]
     [string]$Message,
 
-    [switch]$Push
+    [Parameter(ParameterSetName = 'Commit')]
+    [switch]$Push,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'PushOnly')]
+    [switch]$PushOnly,
+
+    [switch]$BranchOnly
 )
 
-# Stop immediately on errors.
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
+$shouldPush = $Push -or $PushOnly
 
-# Stage all changes.
-git add .
+Push-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
+try {
+    if ($shouldPush) {
+        $branch = git branch --show-current
+        if ($LASTEXITCODE -ne 0 -or -not $branch) {
+            throw 'Check out a local branch before pushing.'
+        }
+    }
 
-# Create the commit with the provided message.
-git commit -m $Message
+    if (-not $PushOnly) {
+        git add .
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-# Stop if commit failed.
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+        git commit -m $Message
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+
+    if (-not $shouldPush) { return }
+
+    $branchRef = "refs/heads/$branch"
+    $upstream = git for-each-ref --format='%(upstream:short)' $branchRef
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    $contributionBranch = git config --local --get gridDemo.contributionBranch
+    if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }
+    if ($BranchOnly -or $branch -cne $contributionBranch) {
+        if ($upstream) {
+            git push
+        }
+        else {
+            git push -u origin $branch
+        }
+        exit $LASTEXITCODE
+    }
+
+    $remoteHead = git ls-remote --symref --exit-code origin HEAD
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    $defaultRef = $null
+    foreach ($line in $remoteHead) {
+        if ($line -match '^ref: (refs/heads/\S+)\s+HEAD$') {
+            $defaultRef = $Matches[1]
+            break
+        }
+    }
+    if (-not $defaultRef) {
+        throw 'Could not identify the default branch on origin.'
+    }
+
+    $commit = git rev-parse HEAD
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $refspecs = @("${commit}:${branchRef}")
+    if ($defaultRef -cne $branchRef) { $refspecs += "${commit}:${defaultRef}" }
+
+    # Keep the original author and commit dates. Git rejects non-fast-forward
+    # updates and the remote applies both branch updates as a single operation.
+    git push --atomic origin @refspecs
+    if ($LASTEXITCODE -ne 0) {
+        $pushExit = $LASTEXITCODE
+        Write-Warning 'Publish failed. Check the remote branches before retrying with -PushOnly.'
+        exit $pushExit
+    }
+
+    if (-not $upstream) {
+        git branch --set-upstream-to "origin/$branch" $branch
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    Write-Host "Published $commit to origin/$branch and the default branch ($defaultRef)."
 }
-
-# Push only when -Push was passed.
-if ($Push) {
-    $currentBranch = (git branch --show-current).Trim()
-    if (-not $currentBranch) {
-        Write-Error "Failed to determine current git branch."
-        exit 1
-    }
-
-    git rev-parse --abbrev-ref --symbolic-full-name "@{u}" *> $null
-    $hasUpstream = ($LASTEXITCODE -eq 0)
-
-    if ($hasUpstream) {
-        git push
-    }
-    else {
-        git push -u origin $currentBranch
-    }
-
-    exit $LASTEXITCODE
+finally {
+    Pop-Location
 }

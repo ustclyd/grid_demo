@@ -130,6 +130,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Me
 3. 自动写入 Obsidian 日志
 4. `git push`
 
+### 4.3 让真实提交进入 GitHub 贡献统计
+
+本项目在已启用贡献同步的本机仓库中，从 `puzzle-prototype` 使用 `-Push` 时，脚本读取 GitHub 当前的默认分支，并将同一个提交推送到开发分支和默认分支。两条分支都能快进才会一起更新。默认分支分叉或被保护时，先检查远端的变更，再通过 PR 合并。
+
+仅上传已经提交的版本时，可以跳过暂存和提交。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -PushOnly
+```
+
+这次只想同步开发分支时，在 `-Push` 或 `-PushOnly` 后加 `-BranchOnly`。
+
+换电脑或重新克隆后，可在仓库根目录重新启用本项目的贡献同步。
+
+```powershell
+git config --local gridDemo.contributionBranch puzzle-prototype
+```
+
+贡献图按提交作者的日期统计，同一天的多次提交计入同一格。作者邮箱须与 GitHub 账号关联，符合条件的提交可能需要 24 小时才显示。
+
 ## 5. 为什么命令前面要写这么长一串 PowerShell
 
 你现在不能直接运行：
