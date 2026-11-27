@@ -21,7 +21,11 @@ class Position:
 
 # For terrain-free levels whose enemy policies depend only on the current board.
 # Terrain timers or turn-dependent policies would need additional state in the key.
-static func inspect(level: PuzzleLevelData, shortest_only: bool = false) -> Dictionary:
+static func inspect(
+	level: PuzzleLevelData,
+	shortest_only: bool = false,
+	allow_throw: bool = true,
+) -> Dictionary:
 	if not level.trail_cells.is_empty():
 		return {}
 	var start := PuzzleSession.new()
@@ -41,6 +45,8 @@ static func inspect(level: PuzzleLevelData, shortest_only: bool = false) -> Dict
 		if shortest_only and shortest > 0 and depth > shortest:
 			break
 		for action in PuzzleActions.list_intents(position.session.get_board_snapshot(), PuzzleLevelData.PLAYER_ID):
+			if not allow_throw and action.type == ActionType.THROW:
+				continue
 			var branch := position.session.fork()
 			if not branch.submit_turn(action.type, action.target_pos):
 				return {}

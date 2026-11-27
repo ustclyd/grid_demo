@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="1_level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_fixed_thrower_policy.gd" id="3_thrower"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_coin_collector_policy.gd" id="4_collector"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_sentry_policy.gd" id="5_guard"]
+
+[sub_resource type="Resource" id="Resource_left_aim"]
+script = ExtResource("3_thrower")
+kind = 9
+target_cell = Vector2i(2, 0)
+
+[sub_resource type="Resource" id="Resource_right_aim"]
+script = ExtResource("3_thrower")
+kind = 9
+target_cell = Vector2i(0, 0)
+
+[sub_resource type="Resource" id="Resource_collect"]
+script = ExtResource("4_collector")
+kind = 7
+route = Array[Vector2i]([Vector2i(1, 3), Vector2i(0, 2), Vector2i(0, 3)])
+
+[sub_resource type="Resource" id="Resource_guard"]
+script = ExtResource("5_guard")
+
+[sub_resource type="Resource" id="Resource_left_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(0, 0)
+coins = 3
+policy = SubResource("Resource_left_aim")
+
+[sub_resource type="Resource" id="Resource_right_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(2, 0)
+coins = 2
+policy = SubResource("Resource_right_aim")
+
+[sub_resource type="Resource" id="Resource_collect_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(1, 3)
+coins = 1
+policy = SubResource("Resource_collect")
+
+[sub_resource type="Resource" id="Resource_near_guard_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(2, 2)
+policy = SubResource("Resource_guard")
+
+[sub_resource type="Resource" id="Resource_far_guard_spawn"]
+script = ExtResource("2_spawn")
+cell = Vector2i(2, 1)
+coins = 1
+policy = SubResource("Resource_guard")
+
+[resource]
+script = ExtResource("1_level")
+title = "08 · 断流"
+play_hint = "定点投手互投 A1、C1 · 拾金兵追未被别人占住的钱袋
+没钱袋可捡时，拾金兵巡回 B4 → A3 → A4 → B4"
+board_size = Vector2i(3, 4)
+player_cell = Vector2i(2, 3)
+enemies = Array[ExtResource("2_spawn")]([SubResource("Resource_left_spawn"), SubResource("Resource_right_spawn"), SubResource("Resource_collect_spawn"), SubResource("Resource_near_guard_spawn"), SubResource("Resource_far_guard_spawn")])
+optimal_turns = 9
