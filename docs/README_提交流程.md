@@ -200,13 +200,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev_commit.ps1 -Me
 路径规则是：
 
 ```text
-D:\obsidian\仓库\游戏开发\10-开发日志\YYYY\YYYY-MM\YYYY-MM-DD.md
+D:\仓库\游戏开发\10-开发日志\YYYY\YYYY-MM\YYYY-MM-DD.md
 ```
 
 比如今天是 `2026-03-25`，那就是：
 
 ```text
-D:\obsidian\仓库\游戏开发\10-开发日志\2026\2026-03\2026-03-25.md
+D:\仓库\游戏开发\10-开发日志\2026\2026-03\2026-03-25.md
 ```
 
 打开之后，找到：

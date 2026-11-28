@@ -253,7 +253,7 @@ New-UnicodeString @(0x4ED3, 0x5E93)
 最后拼成：
 
 ```text
-D:\obsidian\仓库\游戏开发\10-开发日志\2026\2026-03\2026-03-25.md
+D:\仓库\游戏开发\10-开发日志\2026\2026-03\2026-03-25.md
 ```
 
 ### `New-DailyLogFromTemplate`

@@ -30,7 +30,7 @@ function Add-Prefix {
 function Get-DefaultVaultRoot {
     $warehouse = New-UnicodeString @(0x4ED3, 0x5E93)
     $gameDev = New-UnicodeString @(0x6E38, 0x620F, 0x5F00, 0x53D1)
-    return Join-Path "D:\obsidian" (Join-Path $warehouse $gameDev)
+    return Join-Path "D:\" (Join-Path $warehouse $gameDev)
 }
 
 function Get-DefaultTemplatePath {
