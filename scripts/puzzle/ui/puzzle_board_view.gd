@@ -8,6 +8,7 @@ const DARK_TILE := Color("#1d2c41")
 const PLAYER_COLOR := Color("#74cef5")
 const ENEMY_COLOR := Color("#ff967d")
 const COIN_COLOR := Color("#f8cd73")
+const PRESSED_PLATE_COLOR := Color("#88e8b4")
 
 var _board: GameState
 var _selection: ActionIntent
@@ -55,6 +56,7 @@ func _draw() -> void:
 	if side <= 0.0:
 		return
 	var origin := _board_origin(side)
+	var pressed := _board.occupied_pressure_cells()
 	for y in _board.board_size.y:
 		for x in _board.board_size.x:
 			var cell := Vector2i(x, y)
@@ -66,6 +68,12 @@ func _draw() -> void:
 				if _board.trail.has_left(cell):
 					tile_color = Color("#252830")
 			draw_rect(rect, tile_color)
+			if _board.pressure_cells.has(cell):
+				var occupied := pressed.has(cell)
+				var plate_color := PRESSED_PLATE_COLOR if occupied else COIN_COLOR
+				draw_rect(rect.grow(-4.0), plate_color, false, 2.0)
+				var label_center := rect.position + rect.size * Vector2(0.77, 0.15)
+				_draw_label(label_center, "已压" if occupied else "压板", side * 0.12, plate_color)
 			if _board.trail != null and cell == _board.trail.exit_cell:
 				draw_rect(rect.grow(-2.0), COIN_COLOR, false, 2.0)
 				_draw_label(rect.position + rect.size * Vector2(0.80, 0.17), "终", side * 0.17, COIN_COLOR)

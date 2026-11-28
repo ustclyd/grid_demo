@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="enemy"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_patroller_policy.gd" id="patrol"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_bouncer_policy.gd" id="bouncer"]
+
+[sub_resource type="Resource" id="east_patrol"]
+script = ExtResource("patrol")
+kind = 3
+route = Array[Vector2i]([Vector2i(4, 3), Vector2i(3, 3), Vector2i(2, 3), Vector2i(2, 2), Vector2i(3, 2)])
+
+[sub_resource type="Resource" id="north_patrol"]
+script = ExtResource("patrol")
+kind = 3
+route = Array[Vector2i]([Vector2i(2, 1), Vector2i(2, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(2, 2)])
+
+[sub_resource type="Resource" id="south_bouncer"]
+script = ExtResource("bouncer")
+kind = 2
+endpoint_a = Vector2i(0, 2)
+endpoint_b = Vector2i(1, 1)
+
+[sub_resource type="Resource" id="east_enemy"]
+script = ExtResource("enemy")
+cell = Vector2i(4, 3)
+coins = 2
+policy = SubResource("east_patrol")
+
+[sub_resource type="Resource" id="north_enemy"]
+script = ExtResource("enemy")
+cell = Vector2i(2, 1)
+coins = 2
+policy = SubResource("north_patrol")
+
+[sub_resource type="Resource" id="south_enemy"]
+script = ExtResource("enemy")
+cell = Vector2i(0, 2)
+coins = 1
+policy = SubResource("south_bouncer")
+
+[resource]
+script = ExtResource("level")
+title = "13 · 合拍"
+play_hint = "同一回合结束时，四块压板都被活棋子占住即可通关
+东巡 E4 → D4 → C4 → C3 → D3 → E4
+北巡 C2 → C1 → B1 → B2 → C3 → C2 · 折返 A3 ↔ B2"
+board_size = Vector2i(5, 4)
+player_cell = Vector2i(0, 1)
+player_coins = 3
+enemies = Array[ExtResource("enemy")]([SubResource("east_enemy"), SubResource("north_enemy"), SubResource("south_enemy")])
+pressure_cells = Array[Vector2i]([Vector2i(3, 3), Vector2i(1, 0), Vector2i(1, 1), Vector2i(1, 2)])
+optimal_turns = 16

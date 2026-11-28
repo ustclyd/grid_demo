@@ -107,8 +107,16 @@ func submit_turn(action_type: String, target: Vector2i = Vector2i.ZERO) -> bool:
 	if not player.alive:
 		_phase = Phase.LOST
 		level_lost.emit(turns)
-	elif player.coins == _target_coins and (_board.trail == null or _board.trail.is_complete(player.pos)):
+	elif _goal_is_met(player):
 		_phase = Phase.WON
-		var collected := player.coins - _starting_coins
+		var collected := player.coins - _starting_coins if _board.pressure_cells.is_empty() else 0
 		level_won.emit(collected, turns, float(collected) / turns)
 	return true
+
+
+func _goal_is_met(player: UnitState) -> bool:
+	if _board.trail != null and not _board.trail.is_complete(player.pos):
+		return false
+	if not _board.pressure_cells.is_empty():
+		return _board.occupied_pressure_cells().size() == _board.pressure_cells.size()
+	return player.coins == _target_coins

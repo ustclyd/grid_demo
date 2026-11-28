@@ -10,6 +10,7 @@ var _enemy_names: Dictionary[int, String] = {}
 @onready var _status: Label = %Status
 @onready var _intent_label: Label = %Intent
 @onready var _rules: Label = %LevelRules
+@onready var _controls_hint: Label = $Center/Content/Hint
 @onready var _result: Label = %Result
 @onready var _board_view: PuzzleBoardView = %Board
 @onready var _stay_button: Button = %Stay
@@ -40,6 +41,9 @@ func _restart() -> void:
 		_stay_button.disabled = true
 		return
 	_title.text = level.title
+	_controls_hint.text = "左键选移动 · 右键选投掷"
+	if level.pressure_cells.is_empty():
+		_controls_hint.text = "集齐棋盘上的金币 · " + _controls_hint.text
 	_rules.text = level.play_hint
 	_rules.visible = not level.play_hint.is_empty()
 	var has_trail := not level.trail_cells.is_empty()
@@ -96,7 +100,12 @@ func _submit() -> void:
 func _refresh() -> void:
 	var board := _session.get_board_snapshot()
 	var player := board.get_unit_by_id(PuzzleLevelData.PLAYER_ID)
-	_status.text = "回合 %d    持币 %d / %d" % [board.turn_index, player.coins, _session.get_target_coins()]
+	if board.pressure_cells.is_empty():
+		_status.text = "回合 %d    持币 %d / %d" % [board.turn_index, player.coins, _session.get_target_coins()]
+	else:
+		_status.text = "回合 %d    压板 %d / %d    持币 %d" % [
+			board.turn_index, board.occupied_pressure_cells().size(), board.pressure_cells.size(), player.coins,
+		]
 	if board.trail != null:
 		_status.text += "    未踏 %d" % board.trail.remaining_cells()
 	var active := _session.get_phase() == PuzzleSession.Phase.ACTIVE
@@ -127,7 +136,10 @@ func _selection_text(player: UnitState) -> String:
 
 
 func _on_level_won(coins: int, turns: int, score: float) -> void:
-	_result.text = "通关 · 净收集 %d 币 · %d 回合 · 得分 %.2f" % [coins, turns, score]
+	if level.pressure_cells.is_empty():
+		_result.text = "通关 · 净收集 %d 币 · %d 回合 · 得分 %.2f" % [coins, turns, score]
+	else:
+		_result.text = "通关 · 压板全开 · %d 回合" % turns
 	if level.optimal_turns > 0:
 		if turns == level.optimal_turns:
 			_result.text += "\n达到最优回合数"

@@ -13,6 +13,7 @@ const PLAYER_ID := 1
 @export var optimal_turns: int = 0
 @export var trail_cells: Array[Vector2i] = []
 @export var trail_exit := Vector2i.ZERO
+@export var pressure_cells: Array[Vector2i] = []
 
 
 func validation_error() -> String:
@@ -33,6 +34,16 @@ func validation_error() -> String:
 			return "路线的起点或终点无效。"
 	if optimal_turns < 0:
 		return "最优回合数须为非负数。"
+
+	if pressure_cells.size() > enemies.size() + 1:
+		return "压板数量超过开局棋子数。"
+	var plate_positions: Dictionary[Vector2i, bool] = {}
+	for cell in pressure_cells:
+		if not bounds.has_point(cell) or (trail != null and not trail.is_floor(cell)):
+			return "压板必须位于棋盘的可行走格。"
+		if plate_positions.has(cell):
+			return "压板位置重复。"
+		plate_positions[cell] = true
 
 	var occupied: Dictionary[Vector2i, bool] = {}
 	occupied[player_cell] = true
@@ -63,7 +74,7 @@ func validation_error() -> String:
 		if trail != null and not trail.is_floor(bag.cell):
 			return "第 %d 个钱袋必须放在可行走格。" % (index + 1)
 		available_coins += bag.coins
-	if available_coins == 0:
+	if pressure_cells.is_empty() and available_coins == 0:
 		return "开局必须有待收集的金币。"
 	return ""
 
@@ -71,6 +82,7 @@ func validation_error() -> String:
 func build_board() -> GameState:
 	var board := GameState.new()
 	board.board_size = board_size
+	board.pressure_cells = pressure_cells.duplicate()
 	if not trail_cells.is_empty():
 		board.trail = PuzzleTrail.new(trail_cells, trail_exit)
 	board.units.append(_make_unit(PLAYER_ID, player_cell, player_coins))
