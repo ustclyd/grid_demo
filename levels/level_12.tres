@@ -1,0 +1,79 @@
+[gd_resource type="Resource" script_class="PuzzleLevelData" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_level_data.gd" id="level"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_enemy_spawn.gd" id="enemy"]
+[ext_resource type="Script" path="res://scripts/puzzle/puzzle_bag_spawn.gd" id="bag"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_watcher_policy.gd" id="watcher"]
+[ext_resource type="Script" path="res://scripts/puzzle/enemies/puzzle_sentry_policy.gd" id="guard"]
+
+[sub_resource type="Resource" id="watcher_1"]
+script = ExtResource("watcher")
+kind = 6
+radius = 1
+
+[sub_resource type="Resource" id="enemy_1"]
+script = ExtResource("enemy")
+cell = Vector2i(2, 0)
+coins = 0
+policy = SubResource("watcher_1")
+
+[sub_resource type="Resource" id="enemy_2"]
+script = ExtResource("enemy")
+cell = Vector2i(1, 3)
+coins = 0
+policy = SubResource("watcher_1")
+
+[sub_resource type="Resource" id="guard"]
+script = ExtResource("guard")
+
+[sub_resource type="Resource" id="enemy_3"]
+script = ExtResource("enemy")
+cell = Vector2i(1, 0)
+coins = 1
+policy = SubResource("guard")
+
+[sub_resource type="Resource" id="enemy_4"]
+script = ExtResource("enemy")
+cell = Vector2i(3, 3)
+coins = 1
+policy = SubResource("guard")
+
+[sub_resource type="Resource" id="watcher_2"]
+script = ExtResource("watcher")
+kind = 6
+radius = 2
+
+[sub_resource type="Resource" id="enemy_5"]
+script = ExtResource("enemy")
+cell = Vector2i(3, 2)
+coins = 0
+policy = SubResource("watcher_2")
+
+[sub_resource type="Resource" id="bag_1"]
+script = ExtResource("bag")
+cell = Vector2i(3, 0)
+coins = 1
+required_coins = 0
+
+[sub_resource type="Resource" id="bag_2"]
+script = ExtResource("bag")
+cell = Vector2i(2, 2)
+coins = 2
+required_coins = 0
+
+[sub_resource type="Resource" id="bag_3"]
+script = ExtResource("bag")
+cell = Vector2i(4, 0)
+coins = 1
+required_coins = 0
+
+[resource]
+script = ExtResource("level")
+title = "12 · 错峰"
+play_hint = "警戒兵以回合起点追击 · C1、B4 出生的两名半径 1，D3 出生的半径 2
+守卫原地待机 · 金库要求精确余额，结算先拾本格散币"
+board_size = Vector2i(5, 4)
+player_cell = Vector2i(0, 0)
+player_coins = 2
+enemies = Array[ExtResource("enemy")]([SubResource("enemy_1"), SubResource("enemy_2"), SubResource("enemy_3"), SubResource("enemy_4"), SubResource("enemy_5")])
+bags = Array[ExtResource("bag")]([SubResource("bag_1"), SubResource("bag_2"), SubResource("bag_3")])
